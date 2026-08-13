@@ -1,0 +1,160 @@
+{
+  "created_at": "2026-08-13T23:00:36.653737+00:00",
+  "cycle_id": "CYCLE-000007",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Monorepo root with pnpm/npm workspaces, TypeScript 5 in strict mode, `noUncheckedIndexedAccess` active, zero `any` allowed",
+          "All eight package stubs under `packages/` scaffolded with correct `tsconfig.json` and empty index",
+          "Lint rule enforcing all prohibitions from §13 (Math.random, Date, performance.now, Math.sin/cos/exp/log/pow/sqrt, float literals on economic values, sort without comparator, console, fetch, fs, electron in pure packages) — active and blocking",
+          "Dependency boundary lint preventing imports across the declared DAG in §14.5 — active and blocking",
+          "CI pipeline skeleton: compile, lint, test steps running on push — passing (trivially, on empty packages)",
+          "Electron app skeleton at `apps/desktop/` with `contextIsolation:true`, `nodeIntegration:false`, `sandbox:true` — satisfying INV-29",
+          "Minimal installer config for Windows and Linux via electron-builder producing a launchable empty window"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§14.1 Stack travada",
+          "§14.4 Estrutura de pacotes",
+          "§14.5 Arquitetura verificável",
+          "§13 Proibições verificáveis por lint",
+          "§17 Gate de CI",
+          "INV-26",
+          "INV-29"
+        ],
+        "title": "Monorepo scaffold, TypeScript strict config, CI pipeline, and lint gates",
+        "why_now": "The repository contains zero source code. Every other proposal depends on a buildable workspace with enforceable constraints. ADR-003, ADR-004, and section 13 require compile-time and lint-time enforcement of determinism and dependency boundaries; those gates must exist before any domain code is written, or violations accumulate silently. The FASE-1 acceptance criteria explicitly require lint of determinism and lint of dependency frontiers to be active and blocking in CI before acceptance."
+      },
+      {
+        "acceptance_targets": [
+          "Branded types: `Money`, `Quantity`, `Price`, `Rate` as `bigint` nominal types with constructors that reject non-integer and out-of-range values",
+          "Branded types: `Tick` and noise/index types as `number` nominal types restricted to safe integer range, with constructors that reject non-integer, NaN, Infinity, and values outside [-(2^53-1), 2^53-1]",
+          "Constants: `QUANTITY_SCALE = 100_000_000n`, `PRICE_SCALE = 10_000n`, `RATE_SCALE = 100_000_000n`",
+          "Arithmetic helpers: `addMoney`, `subMoney`, `mulQuantityPrice` (returns bigint intermediate), `divBigInt(a, b, mode)` where mode is `TRUNCATE_TOWARD_ZERO | ROUND_HALF_UP | ROUND_HALF_EVEN` — calling without mode is a TypeScript type error",
+          "ADR written in `docs/decisions/` specifying the technical mechanism that makes rounding-mode omission a compile error",
+          "Unit tests: all constructors reject invalid inputs; arithmetic helpers produce correct results; notional calculation `(quantityRaw * priceRaw) / (QUANTITY_SCALE * PRICE_SCALE)` is exact in bigint; no safe-integer overflow across 10-year tick range",
+          "Lint rule from IDEA-001 catches division operator `/` used directly on branded types outside the helper"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "§4 Glossário travado",
+          "INV-04",
+          "INV-07",
+          "INV-23"
+        ],
+        "title": "packages/core — branded numeric types, bigint arithmetic, and explicit rounding",
+        "why_now": "All other packages depend on `core`. INV-23, ADR-003, and ADR-004 demand that every economic value is a branded bigint, every division declares a rounding mode, and no safe-integer operation overflows 2^53. These types are the compiler-enforced foundation for determinism. Without them, downstream packages will use plain `number` and the constraint system collapses. An ADR for the rounding-mode enforcement mechanism (DEFINIR in ADR-004) must accompany this work."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in `docs/decisions/` specifying: hash function algorithm bit-exactly (e.g. SplitMix64 over FNV-1a accumulator of concatenated arguments), argument encoding into the accumulator, output range, and rationale for why it is not the native language hash",
+          "`rand(masterSeed: string, namespace: string, ...coords: number[]): number` implemented in `packages/core` using the specified algorithm, returning a value in [0, 2^53-1] as a safe integer",
+          "All eleven namespaces from the ADR-002 table declared as typed constants in `packages/core/namespaces.ts`",
+          "Test: `rand(seed, ns, a, b)` is pure — same inputs always produce same output",
+          "Test: `rand(seed, ns, a, b)` is sensitive to each coordinate — changing any single argument changes the output",
+          "Test: distinct namespaces produce distinct outputs for identical coordinates",
+          "No call to `Math.random`, `crypto.randomUUID`, or any stateful PRNG anywhere in `packages/core`"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-12",
+          "§19 Lacunas conhecidas — função de hash"
+        ],
+        "title": "ADR + packages/core positional RNG — rand(seed, namespace, ...coordinates)",
+        "why_now": "ADR-002 requires a stateless positional RNG and lists all namespaces. The hash function is DEFINIR and must be specified bit-exactly in an ADR before any implementation. Without a committed hash function, any world generation or state hash written now will be incompatible with later work and require a breaking change to `encodingVersion`. This ADR and implementation are prerequisites for `packages/world` and for INV-02 and INV-12."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in `docs/decisions/` specifying: UTF-8 byte-order key sorting applied recursively; bigint as decimal ASCII with explicit sign, no leading zeros, no exponential notation; safe integer with a distinct type marker so `1n !== 1` in the encoding; explicit ordered-collection and unordered-collection encodings; `encodingVersion` participation in the hash; prohibition on undefined, NaN, Infinity, -0 (occurrence is a thrown error, not silent normalization)",
+          "`CanonicalEncoder` implemented in `packages/core` per the ADR",
+          "`StateHash` function: accepts the canonical state fields listed in §ADR-009 (excluding finalTick and narrative), returns a hex string",
+          "`SaveHash` function: accepts the full save envelope fields (including finalTick, masterSeed, actions log, specVersion, rulesetVersion, encodingVersion), returns a hex string",
+          "Test: two logically-equal objects with different key insertion order produce the same bytes",
+          "Test: `1n` (bigint) and `1` (safe integer) produce different bytes",
+          "Test: object containing `undefined` throws; object containing `NaN` throws",
+          "Test: `StateHash` of a state does not change when `finalTick` changes with all other fields held constant (INV-22 invariant)",
+          "Test: `SaveHash` changes when any envelope field changes"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-009",
+          "INV-01",
+          "INV-17",
+          "INV-22",
+          "INV-24",
+          "§14.2 Serialização na fronteira de processo"
+        ],
+        "title": "ADR-009 + packages/core CanonicalEncoder and StateHash/SaveHash",
+        "why_now": "The FASE-1 acceptance criteria explicitly require 'ADR-009 written and the encoder implemented before any state hash exists.' INV-22 depends on byte-identical canonical encoding. Without this, any hash computed in tests or in the tick loop is not canonical, and all INV-01, INV-17, INV-22, INV-24 tests will be built on a wrong foundation. This must precede the ledger, the tick loop, and the replay CLI."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in `docs/decisions/` specifying fixed-point or lookup-table implementations for log and exp used in logPrice construction — bit-identical output on any IEEE-754 platform, per §5.1 requirement",
+          "`price(assetId, tick): Price` implemented for `ORB` and `NEXA` (or any two of the §4 assets) using: `logPrice0`, two-octave `trendLayer` with fractal noise via positional RNG, two-octave `idiosyncraticNoise`, `regimeAmplitude`; parameters in a versioned config file",
+          "Test (INV-02): `price(asset, 9_000_000)` called directly equals `price(asset, t)` accumulated tick-by-tick for 1000 consecutive ticks at an arbitrary offset",
+          "Test (INV-03): two calls to `price` with different player action logs (injected as exogenous data per ADR-007) produce identical `worldPrice` series",
+          "Benchmark run via `tools/bench` skeleton: `price(asset, tick)` latency measured at p95 across 20 samples with 3 warmup runs; ratio against calibration baseline frozen in a versioned file",
+          "No import of `domain`, `application`, `narrative`, `adapters`, `ui`, `electron`, `node:fs` anywhere in `packages/world`"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-004"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 Construção do preço",
+          "ADR-002",
+          "ADR-003",
+          "ADR-005",
+          "INV-02",
+          "INV-03",
+          "§18 Orçamento de performance",
+          "§14.4 world package"
+        ],
+        "title": "packages/world minimal price generator — two assets, two octaves, tick-loop integration",
+        "why_now": "The FASE-1 acceptance criteria require a working price generator for at least two assets with two noise layers. This is the earliest point at which INV-02 (positional price query equals tick-by-tick advance) and INV-03 (player actions do not alter world price) can be written as green tests. It also establishes the performance baseline that `tools/bench` must freeze — a prerequisite for the FASE-1 benchmark gate. However, it depends on fixed-point transcendental function approximations (log and exp are prohibited by §13), which require their own ADR before implementation begins."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Repository contains only git infrastructure, a frozen spec copy under benchmark/, empty history directories, and a README. No source code, no packages, no TypeScript configuration, no CI pipeline, no lint gates, and no Electron scaffold exist anywhere in the workspace.",
+      "highest_priority_gap": "No monorepo scaffold exists. Without a buildable workspace, TypeScript strict config, and active lint gates for determinism and dependency boundaries, no domain code can be written without silently violating the invariants that the entire architecture depends on."
+    },
+    "warnings": [
+      "ADR-004 marks the technical enforcement mechanism for explicit rounding modes as DEFINIR. This ADR must be written and the mechanism decided before any arithmetic implementation in packages/core — otherwise the compile-time guarantee that ADR-004 requires cannot be established retroactively without breaking changes.",
+      "ADR-002 marks the hash function as DEFINIR with a recommended starting point (SplitMix64 over FNV-1a accumulator). The hash function must be specified bit-exactly in an ADR before any rand() implementation is written, because any change to the hash function after world or state hashes exist requires an encodingVersion bump and invalidates all reference StateHashes.",
+      "The price generator in §5.1 constructs prices in log-space, which requires log and exp. Both are prohibited in pure packages by §13. Fixed-point or lookup-table implementations must be specified in an ADR before packages/world work begins; otherwise the price generator cannot be implemented without violating either §13 or the cross-platform determinism requirement of INV-19.",
+      "The number of octaves, their periods, and their amplitudes for trendLayer and idiosyncraticNoise are DEFINIR (§5.1). These parameters must be recorded in a versioned config file and fixed in an ADR before the price generator is implemented, because changing any parameter after the performance baseline is frozen (FASE-1 acceptance) requires an encodingVersion bump and invalidates reference StateHashes."
+    ]
+  }
+}

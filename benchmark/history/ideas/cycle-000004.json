@@ -1,0 +1,174 @@
+{
+  "created_at": "2026-08-13T22:51:56.209750+00:00",
+  "cycle_id": "CYCLE-000004",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Monorepo root with pnpm/npm workspaces containing packages/core, packages/world, packages/domain, packages/application, packages/narrative, packages/contracts, packages/adapters, packages/ui; apps/desktop/{main,preload,renderer,simulation-worker}; tools/replay, tools/bench",
+          "TypeScript in strict mode with noUncheckedIndexedAccess and no implicit any, enforced across all packages",
+          "Determinism lint active and blocking: rejects Math.random, Date, Date.now, performance.now, setTimeout, setInterval, crypto.randomUUID, Math.sin/cos/exp/log/pow/sqrt, float literals for economic values, Array.sort without explicit comparator, Object.keys/Set/Map iteration without explicit ordering when affecting state, fetch, electron/node:fs/node:path/node:os in pure packages, JSON.stringify over economic values, console — in all packages except adapters and ui",
+          "Dependency boundary lint active and blocking: enforces the directed acyclic graph in §14.5 including transitive closure; rejects any import violating the graph",
+          "CI pipeline skeleton: compile, lint, test stages; matrix of Windows and Linux with the Electron version pinned in a versioned file",
+          "Electron main window with contextIsolation:true, nodeIntegration:false, sandbox:true; preload exposes only an explicit channel allowlist via contextBridge; INV-29 passes",
+          "Minimum installer artifact produced by CI for Windows and Linux (window may be empty)"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.1 Stack travada",
+          "§14.4 Estrutura",
+          "§14.5 Arquitetura verificável",
+          "§13 Proibições verificáveis por lint",
+          "§17 Gate de CI",
+          "INV-26",
+          "INV-29",
+          "FASE-1 aceite"
+        ],
+        "title": "Monorepo scaffold, toolchain, and CI skeleton with Electron security baseline",
+        "why_now": "The repository contains no source code. Every subsequent proposal depends on a buildable monorepo with the correct package topology, TypeScript strict mode, and both lint gates (determinism and dependency boundary) active from the first commit. Establishing these now prevents the structural debt that would require invasive refactoring later. The spec also mandates a working installer by FASE-1 acceptance; discovering packaging problems late is the most common irreversible failure mode identified in §14.6."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed for hash function: specifies the algorithm bit-for-bit (recommendation: SplitMix64 over FNV-1a accumulator of UTF-8-encoded arguments), with cross-platform determinism rationale",
+          "ADR filed for technical enforcement of rounding mode: specifies how calling division without an explicit mode becomes a compile-time or lint-blocking error",
+          "ADR-009 document written before encoder implementation: specifies key ordering (UTF-8 byte comparison, recursive), bigint as decimal ASCII with explicit sign, integer vs bigint type marker, forbidden values (undefined, NaN, Infinity, -0), ordered vs unordered collection encoding, encodingVersion participation in hash",
+          "Branded nominal types in TypeScript: Money (bigint), Quantity (bigint), Price (bigint), Rate (bigint), Tick (number, safe integer), with constructors that reject non-integer, NaN, and out-of-range values",
+          "Division helper with TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN modes; calling it without a mode is a type error",
+          "Positional RNG: rand(masterSeed, namespace, ...coordinates) -> uint64, implemented with the hash function from the ADR; namespaces from ADR-002 defined as constants",
+          "CanonicalEncoder implemented as specified in ADR-009; StateHash and SaveHash as distinct functions with the distinction documented",
+          "Unit tests: all arithmetic types reject invalid construction; RNG produces same output for same inputs in any call order (no sequential state); CanonicalEncoder produces identical bytes for logically equal states and different bytes for different states; INV-12, INV-22, INV-23 pass"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-002",
+        "risk": "high",
+        "spec_refs": [
+          "ADR-002",
+          "ADR-003",
+          "ADR-004",
+          "ADR-009",
+          "INV-12",
+          "INV-22",
+          "INV-23",
+          "§14.4",
+          "FASE-1 aceite"
+        ],
+        "title": "ADRs for hash function and rounding enforcement, then complete core package with nominal types, RNG, and CanonicalEncoder",
+        "why_now": "core has no dependencies and everything depends on it. The hash function (ADR-002, marked DEFINIR) and the technical enforcement mechanism for rounding modes (ADR-004, marked DEFINIR) must be resolved by ADR before any implementation begins, or the implementations will make implicit choices that become de facto locked decisions without audit trail. The spec further mandates that ADR-009 (CanonicalEncoder) be written and the encoder implemented before any state hash exists — any hash appearing before the encoder is an ordering violation."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed for number of octaves, periods, and amplitudes for trendLayer and idiosyncraticNoise; parameters stored in a versioned configuration file; changing any parameter invalidates the spec compatibility hash",
+          "price(assetId, tick) -> Price using only bigint and safe-integer arithmetic; no floating-point in any intermediate step; Math.sin/cos/exp/log/pow prohibited — interpolation via linear fixed-point method",
+          "Two assets implemented: ORB (blue chip, low volatility) and NEXA (layer-1, medium volatility), with archetypes driving generator parameters",
+          "trendLayer and idiosyncraticNoise implemented as positional fractal: octave-indexed, block-indexed, with linear interpolation between block vertices; O(1) per call with no accumulated state",
+          "INV-02 passes: price(asset, t) called directly equals price arrived at by advancing one tick at a time, for all tested t values and both assets",
+          "INV-03 passes: two runs on the same seed with different action logs produce identical worldPrice series",
+          "price() benchmarks within 2µs per the performance protocol in §18 (with 3-run warmup, 20-sample minimum, p95 criterion)"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 Construção do preço",
+          "ADR-001",
+          "ADR-002",
+          "ADR-003",
+          "ADR-005",
+          "INV-02",
+          "INV-03",
+          "§18 Orçamento de performance",
+          "FASE-1 aceite"
+        ],
+        "title": "world package: price generator with 2 assets and 2 noise layers in fixed-point",
+        "why_now": "The price generator is the second foundational piece. Without prices there is nothing to trade, no ledger activity, and no tick loop to test. FASE-1 requires at least two assets (two is sufficient) and two noise layers (trendLayer and idiosyncraticNoise). The octave parameters are marked DEFINIR and need an ADR before implementation, because changing them after the performance baseline is frozen in FASE-1 invalidates the baseline. INV-02 (direct query equals tick-by-tick arrival) is the most important test in the project per the spec and must be green before FASE-1 closes."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction, Entry, Account types with bigint commodity values and explicit commodity declaration on every Entry; Entry without commodity is a type error",
+          "Minimum accounts implemented: world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, player:cash:BRL, player:spot:<ASSET>, venue:fees",
+          "Market order execution (buy spot, sell spot) producing balanced multi-commodity transactions; fee calculation with maker/taker Rate; rounding residue posted to world:rounding_residue per ADR-004",
+          "Canonical 10-step tick processing function in one location; a test asserts the exact invocation order of all 10 steps",
+          "Save format: {specVersion, rulesetVersion, encodingVersion, masterSeed, finalTick, actions[{tick, sequence, type, payload}]} — bigint values in payload serialized without JSON.stringify (format per a required ADR for save file encoding)",
+          "INV-04 passes: every Transaction sums to zero per commodity",
+          "INV-05 passes: sum of all BRL accounts is zero every tick",
+          "INV-06 passes: sum of all quantities per asset is zero every tick",
+          "INV-07 passes: rounding residue accounts for all truncation exactly",
+          "INV-21 passes: finalTick >= max(action.tick), (tick, sequence) pairs unique in log"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-004",
+        "risk": "high",
+        "spec_refs": [
+          "§6 Ledger",
+          "§7 Execução e ordem canônica do tick",
+          "ADR-003",
+          "ADR-004",
+          "ADR-006",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-08",
+          "INV-21",
+          "FASE-1 aceite"
+        ],
+        "title": "domain package: multi-commodity double-entry ledger, market orders, canonical tick loop, and save format",
+        "why_now": "The ledger, market orders, and canonical tick processing order are the remaining pieces needed to make FASE-1 functional end-to-end. The 10-step canonical tick order in §7 must be implemented in a single location and tested for order correctness — the spec identifies out-of-order funding/liquidation as a classical exchange bug. INV-04 through INV-07 and INV-21 are required green for FASE-1 acceptance. The save format (ADR-006) must be established now because the replay CLI in tools/replay depends on it, and tools/bench requires a runnable end-to-end simulation."
+      },
+      {
+        "acceptance_targets": [
+          "tools/replay: CLI accepting two save files (or a seed plus two action log files); replays both deterministically; compares StateHash at every tick; reports first divergent tick with the two differing hashes; exits with nonzero status on divergence",
+          "tools/bench: calibration micro-benchmark of fixed known cost runs first in the same process; measures price(asset, tick) per-call time, 1-tick advance with 0 open positions, replay of 525600 ticks (1 year); all results expressed as ratios against the calibration baseline; warmup 3 runs, 20-sample minimum, p95 reported; full sample array in output, not just aggregate",
+          "Baseline ratio file committed to the repository and referenced by CI; changes to this file require ADR",
+          "CI gate uses tools/bench output to block on >20% ratio regression relative to the committed baseline",
+          "tools/replay used in CI to compare three reference save files across both platforms (Windows and Linux) per §17 gate item 5 and 6"
+        ],
+        "category": "tooling",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003",
+          "IDEA-004"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "low",
+        "spec_refs": [
+          "FASE-1 aceite",
+          "§18 Orçamento de performance",
+          "INV-01",
+          "INV-11",
+          "§17 Gate de CI item 5 and 9"
+        ],
+        "title": "tools/replay CLI and tools/bench with frozen performance baseline",
+        "why_now": "FASE-1 acceptance explicitly requires both tools. tools/replay is the instrument for verifying INV-01 (replay produces same StateHash as live session) and INV-11 (advancing in steps of 1, 100, and direct jump produces same final StateHash). tools/bench must freeze the calibration-relative performance baseline in FASE-1 — if this is deferred, later phases cannot distinguish genuine regressions from hardware variation, and any performance budget violation found in FASE-2 or later will be impossible to attribute. The frozen ratios file is a versioned artifact that only changes by ADR."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Repository is empty of source code. Only initialization commits, benchmark documentation, and empty history directories are present. No packages, no toolchain, no CI pipeline, and no application code exist yet.",
+      "highest_priority_gap": "No monorepo structure, build toolchain, or lint infrastructure exists. Every FASE-1 deliverable is blocked until the package topology, TypeScript strict mode, determinism lint, and dependency boundary lint are established."
+    },
+    "warnings": [
+      "Save file serialization format is an implicit DEFINIR gap: ADR-006 shows the save envelope as a JSON-like structure with action payloads that contain economic values (bigint), but §14.2 prohibits JSON.stringify on any boundary carrying economic values, and JSON does not support bigint natively. The spec does not specify the concrete byte format of the save file. An ADR for save file encoding format is required before implementing save/load in domain — otherwise the implementation will make an implicit choice that may conflict with the CanonicalEncoder and the IPC serialization rules."
+    ]
+  }
+}

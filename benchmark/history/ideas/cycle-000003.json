@@ -1,0 +1,146 @@
+{
+  "created_at": "2026-08-13T22:48:08.526537+00:00",
+  "cycle_id": "CYCLE-000003",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "pnpm or yarn workspaces configured with all package stubs from section 14.4 present (packages/core, packages/world, packages/domain, packages/application, packages/narrative, packages/contracts, packages/adapters, packages/ui, apps/desktop/main, apps/desktop/preload, apps/desktop/renderer, apps/desktop/simulation-worker, tools/replay, tools/bench, tools/package)",
+          "TypeScript configured in strict mode with noUncheckedIndexedAccess active across all packages",
+          "Dependency boundary lint rule present and able to enforce the directed graph from section 14.5 as a blocking check",
+          "Each package has its own tsconfig.json referencing the root composite config",
+          "Build produces zero TypeScript errors on empty stubs"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "Section 14.1 (TypeScript strict mode, noUncheckedIndexedAccess)",
+          "Section 14.4 (packages/, apps/, tools/ topology)",
+          "Section 14.5 (dependency graph: core -> nothing, world/domain/narrative -> core, etc.)",
+          "INV-26 (dependency boundary enforced)"
+        ],
+        "title": "Monorepo bootstrap and TypeScript workspace configuration",
+        "why_now": "The repository contains no source code. The monorepo structure, TypeScript strict-mode configuration, pnpm/yarn workspace setup, ESLint skeleton, and package directory scaffold defined in spec section 14.4 are the absolute prerequisite for any implementation work. Nothing else can be implemented until this exists."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ specifying the hash function bit-for-bit (SplitMix64 over FNV-1a accumulator as recommended by spec)",
+          "Branded nominal types implemented for Money, Quantity, Price, Rate (bigint) and Tick, BlockIndex, Octave (safe-integer number) with constructors that reject non-integer and out-of-range values",
+          "rand(masterSeed, namespace, ...coordinates) pure function implemented and returning uint64 as bigint",
+          "CanonicalEncoder implemented per ADR-009: recursive UTF-8 byte-order key sort, bigint as signed decimal ASCII, safe-integer with distinct type marker, rejection of undefined/NaN/Infinity/-0, ordered and unordered collection encoding, encodingVersion participation",
+          "divTruncate, divRoundHalfUp, divRoundHalfEven helpers for bigint that require explicit mode",
+          "Unit tests covering: rand determinism at arbitrary coordinates, canonical encoding uniqueness, prohibited value rejection, bigint vs safe-integer marker distinction, INV-23 bound validation"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002 (positional RNG, hash function is DEFINIR)",
+          "ADR-003 (Money/Quantity/Price/Rate as branded bigint; Tick as branded safe integer)",
+          "ADR-004 (division with explicit rounding mode)",
+          "ADR-009 (CanonicalEncoder: key ordering, bigint encoding, type markers, prohibited values)",
+          "Section 14.4 (packages/core scope: arithmetic, hash, rng, fixed-point, canonical encoder)",
+          "INV-12 (no external entropy)",
+          "INV-22 (canonical encoding uniqueness)",
+          "INV-23 (safe integer bounds)"
+        ],
+        "title": "ADR for hash function and packages/core implementation",
+        "why_now": "ADR-009 explicitly requires the CanonicalEncoder to be specified in an ADR and implemented before any StateHash is computed. ADR-002 marks the hash function as DEFINIR and must be resolved via ADR before the RNG is implemented. packages/core is the foundation every other package depends on. The hash ADR and core implementation must come before any package that produces hashes or consumes the RNG."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ documenting the chosen enforcement mechanism with rejected alternatives",
+          "ESLint rule (or equivalent) that flags division operator (/) applied to any value whose type is or extends the branded economic types (Money, Quantity, Price, Rate), with no false negatives on direct arithmetic and no false positives on Tick arithmetic",
+          "Rule configured as an error (not warning) in the lint configuration shared by all packages under packages/",
+          "At least two test cases in the lint rule suite: one that passes (division via approved helper), one that fails (bare / operator on economic type)"
+        ],
+        "category": "tooling",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-004 (division without mode is compile error or blocking lint; DEFINIR how enforced)",
+          "Section 13 (lint prohibitions are blocking, not style)",
+          "INV-07 (rounding residue accounts for all lost precision)"
+        ],
+        "title": "ADR for rounding enforcement mechanism and blocking lint rule",
+        "why_now": "ADR-004 states that calling division without an explicit rounding mode must be a compile-time error or blocking lint error, and marks the enforcement mechanism as DEFINIR. This must be resolved before any domain or world code is written, because once bare division appears in economic code it becomes a retroactive fix across many files. Resolving it now costs an ADR and a lint rule; resolving it in FASE-3 costs a multi-file audit."
+      },
+      {
+        "acceptance_targets": [
+          "CI workflow (GitHub Actions or equivalent) that runs on every push: TypeScript strict compilation, determinism lint (blocking), dependency boundary lint (blocking), unit test suite",
+          "Electron app stub in apps/desktop with contextIsolation: true, nodeIntegration: false, sandbox: true, and a preload that exposes only an empty allowlist",
+          "electron-builder configured for Windows (.exe installer) and Linux (.AppImage or .deb) targets",
+          "CI produces installer artifacts for both platforms on the stub app",
+          "INV-29 automated check: a test or CI step that reads the BrowserWindow configuration and asserts the three security flags",
+          "Build reproducibility: two runs on the same commit produce identical installer hashes (modulo any date fields, which must be fixed or removed from the build metadata)"
+        ],
+        "category": "tooling",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "Section 14.6 (installer for Windows and Linux in FASE-1, build reproducibility)",
+          "Section 15 FASE-1 acceptance (lint blocking, CI producing installers)",
+          "Section 17 (CI gate: compilation, lint, unit tests, property tests, platform matrix, installer, Electron security audit)",
+          "INV-29 (contextIsolation active, nodeIntegration off, sandbox on, verified in CI)"
+        ],
+        "title": "CI pipeline with lint gates, test runner, and installer targets",
+        "why_now": "FASE-1 acceptance criteria explicitly require the determinism lint to be active and blocking in CI, dependency boundary lint to be active and blocking, and a minimal installer for Windows and Linux to be produced by CI. The spec section 14.6 states the installer requirement is sequencing-locked: it must exist in FASE-1 or the team discovers ABI and cross-platform problems too late to fix the architecture. Setting up CI now means every subsequent commit is validated automatically."
+      },
+      {
+        "acceptance_targets": [
+          "price(assetId, tick) -> Price function implemented in packages/world using only positionsal RNG from packages/core and integer arithmetic",
+          "Two assets configured (suggest ORB and NEXA from spec table) with archetype parameters in a versioned configuration file",
+          "trendLayer and idiosyncraticNoise implemented as fractal octave noise: each octave samples rand at block vertices and interpolates linearly in fixed-point",
+          "No Math.sin, Math.exp, Math.log, Math.pow, Math.sqrt anywhere in packages/world (enforced by existing lint)",
+          "Test for INV-02: price(asset, t) === result of advancing tick-by-tick from 0 to t, for at least 100 random (asset, t) pairs",
+          "Test for INV-03: two calls with different action logs produce identical worldPrice series",
+          "Benchmark in tools/bench measuring price(asset, tick) against the 2µs target from section 18"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "Section 5.1 (logPrice construction, trendLayer, idiosyncraticNoise, fractal noise by octaves, O(1) positional lookup)",
+          "ADR-002 (all randomness positional, namespaces market.trend and market.factor)",
+          "ADR-003 (no floating point in domain; transcendental functions via fixed-point table)",
+          "ADR-005 (no OHLC at base tick; price is a single point)",
+          "Section 15 FASE-1 (price generator with two noise layers, two assets)",
+          "INV-02 (direct query equals tick-by-tick result)",
+          "INV-03 (player actions do not alter world price)"
+        ],
+        "title": "packages/world price generator with two noise layers and two assets",
+        "why_now": "FASE-1 requires the price generator with two noise layers (trendLayer and idiosyncraticNoise) and two assets. This is the first functional deliverable of the simulation and the basis for INV-02 (direct price query equals tick-by-tick traversal) and INV-03 (player actions do not affect world price). Implementing it after core is established allows the team to validate the positionality guarantee early, before the full seven-asset configuration is added in FASE-2."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Repository contains no implementation code. Only initialization files, the frozen specification, and empty benchmark history directories are present. No monorepo structure, no packages, no ADRs, no CI configuration, no Electron app, and no tests exist.",
+      "highest_priority_gap": "The monorepo itself does not exist. There is no TypeScript workspace, no package scaffold, and no build infrastructure, making it impossible to write or validate any code against the specification requirements."
+    },
+    "warnings": [
+      "Section 5.3 states bot wealth curves must be queryable in O(1) without tick-by-tick simulation, but also describes a grade-based simulation with liquidation evaluated at sampled price extremes. This is scoped to FASE-4 and does not block FASE-1, but the implementation strategy for bot liquidation on a coarse grid needs an ADR before FASE-4 begins, since the O(1) claim depends on the cache-per-block design being proven correct for the sampled-extreme liquidation approach.",
+      "Section 13 prohibits comments in pure packages, and section 16 item 7 requires ADRs for all DEFINIR resolutions. These two requirements are consistent with each other but the prohibition extends to code comments that would otherwise explain non-obvious invariants. Teams accustomed to inline documentation must structure all rationale in ADRs, not in code. This is not a contradiction but is a process risk if not established as a norm from the first commit."
+    ]
+  }
+}
