@@ -1,0 +1,76 @@
+{
+  "created_at": "2026-08-13T23:12:22.317775+00:00",
+  "cycle_id": "CYCLE-000011",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase and the repository has no production workspace. Accept a reduced, reviewable foundation from IDEA-001: establish the mandated package topology and make strict compilation, determinism lint, and dependency-boundary lint blocking before production logic is introduced. Electron, installers, and feature implementation remain separate FASE-1 work.",
+    "risks": [
+      "Some Section 13 restrictions require custom ESLint rules or AST-aware checks; superficial text matching could miss aliased or indirect violations.",
+      "A boundary checker that validates only package manifests but not source imports could permit architectural violations.",
+      "Creating every mandated directory now can encourage placeholder code; placeholders must remain configuration-only and must not encode future design decisions."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "All mandated directories exist and are registered in the workspace; workspace installation succeeds from the committed lockfile.",
+        "Every TypeScript project inherits strict:true and noUncheckedIndexedAccess:true, and the root compile command exits successfully.",
+        "The lint configuration treats all packages as pure by default and limits impurity exceptions to the packages explicitly permitted by the specification.",
+        "The blocking lint command rejects representative uses of Math.random, wall-clock APIs, prohibited transcendental Math functions, fetch, console, nondeterministic collection traversal, comparator-free Array.sort, forbidden JSON serialization of economic structures, and Node/Electron imports from pure packages.",
+        "The dependency-boundary command rejects imports outside the Section 14.5 directed graph and exits successfully for the repository's valid imports.",
+        "CI runs clean installation, compilation, lint, dependency-boundary validation, and tests; every job passes on the committed repository state.",
+        "SPEC_BLOCKERS.md exists and provides the Section 19 fields without inventing or resolving a specification contradiction.",
+        "No production algorithm or unresolved DEFINIR-dependent behavior is introduced."
+      ],
+      "cycle_id": "CYCLE-000011",
+      "must_preserve": [
+        "The frozen specification and benchmark files remain byte-for-byte unchanged.",
+        "Existing benchmark history, checkpoint, and orchestration scaffolding remain untouched.",
+        "Pure packages cannot import Node or Electron APIs.",
+        "No DEFINIR decision is embedded in implementation before its required ADR.",
+        "All gates are blocking and cannot pass by silently excluding newly added package source files."
+      ],
+      "objective": "Create the FASE-1 workspace foundation with strict TypeScript and executable CI gates that reject prohibited nondeterminism and illegal package dependencies.",
+      "out_of_scope": [
+        "Electron runtime implementation and BrowserWindow security configuration.",
+        "Windows NSIS or Linux AppImage packaging.",
+        "ADRs for hash, rounding enforcement, canonical encoding, price mathematics, or octave parameters.",
+        "Production simulation, numeric, RNG, hashing, world, domain, application, replay, benchmark, or UI behavior.",
+        "Dependencies or architecture intended only for phases after FASE-1."
+      ],
+      "required_adrs": [],
+      "required_tests": [
+        "Automated rule tests containing one failing fixture for each Section 13 prohibition category and passing fixtures for authorized code.",
+        "Automated boundary tests with at least one allowed edge and representative forbidden edges, including a transitive dependency violation.",
+        "A configuration test that enumerates workspace TypeScript projects and verifies strict and noUncheckedIndexedAccess remain enabled.",
+        "Run the same root compile, lint, boundary-check, and test commands locally and in CI."
+      ],
+      "scope": [
+        "Create the root pnpm workspace and package manifests for packages/core, packages/world, packages/domain, packages/application, packages/narrative, packages/contracts, packages/adapters, packages/ui, apps/desktop/main, apps/desktop/preload, apps/desktop/renderer, apps/desktop/simulation-worker, tools/replay, tools/bench, tools/package, and docs/decisions.",
+        "Configure TypeScript 5.x with strict mode and noUncheckedIndexedAccess enabled for every workspace project.",
+        "Configure ESLint so packages are pure by default, with only the specification-authorized impure package exceptions, and make the Section 13 deterministic-code prohibitions blocking.",
+        "Implement a blocking dependency-boundary check for the directed package graph in Section 14.5.",
+        "Add root compile, lint, boundary-check, and test commands and run them in CI on pushes and pull requests.",
+        "Create SPEC_BLOCKERS.md using the Section 19 ambiguity-reporting structure.",
+        "Add minimal fixtures/tests proving the lint and dependency gates reject representative forbidden cases rather than merely configuring rules."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §13 — Proibições verificáveis por lint",
+        "CICLO_SPEC.md §14.1 — Stack travada",
+        "CICLO_SPEC.md §14.4 — Estrutura",
+        "CICLO_SPEC.md §14.5 — Arquitetura verificável",
+        "CICLO_SPEC.md §15 — FASE-1 acceptance",
+        "CICLO_SPEC.md §17 — Gate de CI",
+        "CICLO_SPEC.md §19 — Protocolo de ambiguidade",
+        "INV-26"
+      ],
+      "task_id": "TASK-0001",
+      "title": "Bootstrap the deterministic TypeScript monorepo and blocking architecture gates"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0001",
+  "title": "Bootstrap the deterministic TypeScript monorepo and blocking architecture gates"
+}
