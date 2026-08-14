@@ -1,0 +1,140 @@
+{
+  "created_at": "2026-08-14T03:24:48.318280+00:00",
+  "cycle_id": "CYCLE-000044",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR-009 §9 explicitly defines the admitted-container model: what constitutes a plain object, plain array, and plain Set for purposes of encoding, and how Proxies, subclasses, and accessor-bearing arrays are handled — either rejected deterministically before any trap fires, or traversed exclusively via module-private captured-intrinsic operations so no user code runs",
+          "All globally readable intrinsics used during encoding (Number.isNaN, Number.isInteger, Number.MAX_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, Object.getPrototypeOf, Object.getOwnPropertyDescriptor, Reflect.ownKeys, Set, Uint8Array, Array.isArray, Object.prototype) are captured in module-private const bindings at module initialisation time and never re-read from the global namespace during a call",
+          "Test: monkeypatch Number.isNaN, Number.isInteger, Object.getPrototypeOf, Reflect.ownKeys, Set, and Uint8Array after module import and assert canonical bytes and rejection errors are unchanged",
+          "Test: plain Proxy with get, set, ownKeys, getOwnPropertyDescriptor, and getPrototypeOf traps — encoder must either reject with a deterministic CanonicalEncoderError or complete without invoking any trap",
+          "Test: revoked Proxy passed as a container — must produce a deterministic CanonicalEncoderError, not an uncaught TypeError",
+          "Test: Array subclass with overridden indexed accessor — must not invoke the accessor",
+          "Test: Set subclass with overridden Symbol.iterator — must not invoke the overridden iterator",
+          "All previously passing acceptance criteria from TASK-0004-review-02 remain green",
+          "Repository lint, strict typecheck, dependency-boundary checks, and all pre-existing tests pass"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-009 — CanonicalEncoder, §9 user-controllable code isolation",
+          "§15 FASE-1 acceptance — ADR-009 written and encoder implemented before any StateHash exists",
+          "INV-22 — logically equal states produce equal canonical bytes",
+          "§13 — no mutable global state in pure packages"
+        ],
+        "title": "CanonicalEncoder with trusted-intrinsic isolation (ADR-009 third attempt)",
+        "why_now": "TASK-0004 has been rejected twice by the reviewer. Both rejections cite the same two defects: (1) container traversal invokes user-controllable code — Proxy traps on ownKeys, getOwnPropertyDescriptor, getPrototypeOf, overridden Set Symbol.iterator, and array index accessors — and (2) encoding behavior depends on mutable global built-ins (Number.isNaN, Number.isInteger, Object.getPrototypeOf, Reflect.ownKeys, Set, Uint8Array) that callers can replace after module import. ADR-009 §9 already promises these paths are isolated but the implementation does not honour that promise. The encoder is the explicit FASE-1 prerequisite for StateHash. Nothing downstream of StateHash can proceed until this is accepted."
+      },
+      {
+        "acceptance_targets": [
+          "ADR-002 exists under docs/decisions and specifies the hash function bit-by-bit with enough detail for an independent implementation to reproduce identical uint64 outputs",
+          "The chosen function is not the language's native hash (per ADR-002 constraint) and is documented with the rationale for the choice",
+          "rand(masterSeed, namespace, ...coordinates) is implemented in packages/core as a pure function with no mutable state: identical arguments always return an identical uint64 represented as bigint",
+          "All namespace strings listed in ADR-002 are accepted; the function rejects non-integer coordinate values with a deterministic error",
+          "Test: golden vectors proving specific (seed, namespace, coordinates) tuples produce specific uint64 values — sufficient for an independent implementation to validate bit-by-bit compatibility",
+          "Test: changing any single argument (seed, namespace, or any coordinate) changes the output",
+          "Test: same arguments called any number of times return identical output (no hidden PRNG state)",
+          "Repository lint, strict typecheck, and boundary checks pass"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002 — positional RNG, hash function is DEFINIR",
+          "§5.1 — trendLayer and idiosyncraticNoise use rand indexed by (assetId, octave, blockIndex)",
+          "INV-02 — price(asset, t) direct equals tick-by-tick",
+          "INV-12 — no identifier depends on external entropy",
+          "§13 — Math.random and crypto.randomUUID are prohibited"
+        ],
+        "title": "Specify ADR-002 and implement positional RNG in packages/core",
+        "why_now": "The price generator (trendLayer, idiosyncraticNoise, marketFactor, macroEvent slots) requires rand(masterSeed, namespace, ...coordinates) -> uint64. ADR-002 marks the hash function as DEFINIR with the constraint that it be specified bit-by-bit in an ADR and must not be the language's native hash. This work is independent of the CanonicalEncoder and can proceed in parallel. Without it, INV-02 (direct price query equals tick-by-tick result) cannot be tested and the two-asset price generator required by FASE-1 cannot be built."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, and Rate are branded bigint types whose constructors reject non-bigint input with a deterministic error",
+          "Tick is a branded number type whose constructor rejects non-integer and out-of-safe-integer-range values with a deterministic error",
+          "Exported constants QUANTITY_SCALE, PRICE_SCALE, and RATE_SCALE match the values declared in ADR-003 (100_000_000, 10_000, 100_000_000)",
+          "Test: constructing Money/Quantity/Price/Rate/Tick from invalid inputs (float, NaN, Infinity, out-of-range integers, wrong JS type) each produce a deterministic typed error",
+          "Test: two branded values of different domain types are not assignable to each other at TypeScript compile time (verified via tsc --noEmit on a negative fixture)",
+          "Test: arithmetic with the scale constants produces results consistent with the notional conversion formula in ADR-003",
+          "Repository lint, strict typecheck, and boundary checks pass"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003 — prohibited floating-point, branded types with bigint, Tick as safe integer",
+          "§6 — ledger uses Money, Quantity per commodity",
+          "§7 — order execution uses Price and Quantity",
+          "INV-23 — no safe integer exceeds 2^53 at any point in a ten-year replay"
+        ],
+        "title": "Implement branded numeric domain types in packages/core",
+        "why_now": "ADR-003 requires Money, Quantity, Price, Rate, and Tick as nominal branded types with constructor validators that reject non-integers and out-of-range values. These types are the foundation for ledger, order, and domain logic. Implementing them now establishes the compile-time and runtime barriers that prevent float usage and cross-type arithmetic errors before any domain code is written. They depend on nothing else in packages/core (not on the encoder, not on the RNG) and can proceed immediately."
+      },
+      {
+        "acceptance_targets": [
+          "ADR-004 exists and specifies the technical mechanism by which calling division without a mode is a compile-time or lint error",
+          "divTruncateTowardZero, divRoundHalfUp, and divRoundHalfEven helpers are implemented in packages/core for the bigint monetary types and return both quotient and remainder",
+          "Test: golden rounding vectors for each mode, including negative dividends and divisors",
+          "Test: dividing a Quantity by a Price in the notional formula produces a result consistent with ADR-003 scale constants",
+          "Repository lint, strict typecheck, and boundary checks pass"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-004 — explicit rounding mode, TRUNCATE_TOWARD_ZERO / ROUND_HALF_UP / ROUND_HALF_EVEN, residue not discarded",
+          "INV-07 — rounding residue explains the exact difference between truncated sum and nominal value",
+          "§13 — division operator on branded types is forbidden; division only via helper with mode"
+        ],
+        "title": "Implement ADR-004 and division helpers in packages/core",
+        "why_now": "ADR-004 requires that every division declare an explicit rounding mode and that the residue be lanced to a rounding-residue account. The technical mechanism for enforcing this (lint rule or type-level wrapper) is a DEFINIR item. Implementing the division helpers alongside an ADR resolving this DEFINIR item prevents silent precision loss in the ledger before any economic computation is written. It can proceed once branded types (IDEA-003) are accepted since helpers operate on Money, Quantity, Price, and Rate."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main creates BrowserWindow with webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true } and no webSecurity:false or allowRunningInsecureContent in any code path",
+          "The preload script exposes only a declared allowlist of IPC channels via contextBridge; there is no generic invoke(channel, args) passthrough",
+          "A Content Security Policy header is set that excludes unsafe-eval and disallows remote resource loading",
+          "An automated test or lint rule verifies that the BrowserWindow configuration matches the required values and fails if any security property is relaxed",
+          "INV-29 is verifiable by the CI Electron security audit step defined in §17"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-005",
+        "risk": "low",
+        "spec_refs": [
+          "§14.2 — contextIsolation true, nodeIntegration false, sandbox true in renderer; preload exposes only allowlisted channels",
+          "§15 FASE-1 — INV-29 green required for acceptance",
+          "INV-29 — security configuration active in all modes",
+          "§17 Gate de CI — Electron security audit"
+        ],
+        "title": "Electron main-process security scaffold satisfying INV-29",
+        "why_now": "INV-29 requires contextIsolation:true, nodeIntegration:false, and sandbox:true in all execution modes including development. FASE-1 acceptance explicitly includes INV-29 green and requires the simulation to run in a dedicated worker. The current apps/desktop/main/src/index.ts is an empty stub. Implementing the minimum BrowserWindow creation with enforced security options and preload channel allowlist establishes the Electron security baseline before any renderer or worker code is added, preventing the cost of retrofitting security constraints onto a permissive baseline later."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo bootstrap is complete: all 16 mandated workspace packages exist as typed stubs, strict TypeScript and ESLint determinism lint are active and passing, and the dependency-boundary checker is enforcing the §14.5 directed graph. No production logic has been committed to any package. TASK-0004 (ADR-009 + CanonicalEncoder) has been attempted twice and rejected both times for the same two implementation defects: container traversal invokes user-controllable Proxy traps and overridden iterators, and encoding behavior reads mutable global built-ins that callers can replace after module import. No other FASE-1 deliverable has been attempted. The docs/decisions directory contains no ADRs.",
+      "highest_priority_gap": "The CanonicalEncoder (ADR-009) is the explicit prerequisite stated in the FASE-1 acceptance criteria ('ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir'). After two failed attempts the implementation defects are precisely identified: trusted-intrinsic capture and Proxy-safe container traversal. Until a passing implementation is accepted, StateHash cannot be produced, the replay CLI cannot compare run outputs, and INV-01, INV-22, and all hash-dependent invariants cannot be tested."
+    },
+    "warnings": [
+      "TASK-0004 has been attempted and rejected twice with identical root causes in both reviews. The required changes are documented precisely in TASK-0004-review-02 findings REVIEW-001 and REVIEW-002. A third attempt that does not address both findings in ADR-009 and in implementation will repeat the same outcome. The acceptance criteria for IDEA-001 make both fixes explicit.",
+      "ADR-002 marks the hash function as DEFINIR. The implementation is free to choose SplitMix64 over FNV-1a (the spec's own recommendation) but the choice must be specified bit-by-bit in the ADR before any golden vectors are committed. Changing the hash function after golden vectors are locked requires a breaking encodingVersion bump.",
+      "ADR-004 is a DEFINIR item for the technical enforcement mechanism of explicit rounding modes. Until the ADR resolves whether enforcement is a lint rule or a type-level wrapper, division helpers cannot claim full compliance. IDEA-004 must resolve this DEFINIR item in its ADR before committing enforcement code."
+    ]
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "created_at": "2026-08-14T03:31:52.901537+00:00",
+  "cycle_id": "CYCLE-000045",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase. The previously attempted CanonicalEncoder has no accepted implementation and retains two review BLOCKERs: traversal may execute user-controlled code, and determinism-sensitive built-ins are read from mutable globals. Completing ADR-009 and a hardened encoder is the smallest corrective unit that restores the required foundation for StateHash and replay work; later-phase features and independent Electron scaffolding are lower priority while this rejected foundational work remains unresolved.",
+    "risks": [
+      "Portable JavaScript does not expose a general standard Proxy-detection API; the implementation must use only a repository-supported, ADR-documented mechanism that can satisfy the zero-trap requirement. If no such mechanism exists across required runtimes, the Implementer must record a Section 19 contradiction/blocker rather than silently weakening this criterion.",
+      "Overbroad monkeypatch defenses can accidentally capture or admit behavior inconsistent with the browser/Electron runtime; tests must execute in every runtime required by the repository.",
+      "Changing canonical byte rules after downstream hashes exist would invalidate replay compatibility, so ADR-009 and golden vectors must be complete in this change."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "ADR-009 exists and unambiguously specifies the canonical byte grammar, admitted values, container ordering, duplicate or collision handling, rejection semantics, and non-execution traversal model before the implementation depends on those decisions.",
+        "All intrinsics used for validation, reflection, brand checking, numeric bounds, key enumeration, descriptor inspection, array recognition, byte-array recognition, and Set traversal are captured in module-private constant bindings at module initialization; encoder calls do not resolve their mutable global properties again.",
+        "For every admitted container element or property, the encoder consumes only an own data descriptor's value; accessor descriptors are rejected with CanonicalEncoderError without invoking their getter or setter.",
+        "Proxy-wrapped candidate containers are rejected with CanonicalEncoderError without invoking ownKeys, getOwnPropertyDescriptor, getPrototypeOf, get, iterator, or other user-defined trap handlers.",
+        "Set subclasses and Set instances with overridden Symbol.iterator or relevant traversal properties are rejected, or traversed solely through a captured non-overridable intrinsic when ADR-009 explicitly proves that path cannot execute user code; test sentinels record zero user-code invocations.",
+        "Array index accessors and Proxy-wrapped arrays deterministically produce CanonicalEncoderError, with zero accessor or Proxy trap handler invocations.",
+        "Replacing mutable globals, including Number.isNaN and Number.isInteger, after module import does not change canonical bytes or rejection classes/messages for identical inputs.",
+        "Logically equal admitted states with different insertion or construction order encode to byte-identical output, satisfying INV-22.",
+        "All pre-existing accepted tests, strict typecheck, lint, dependency-boundary checks, and CI validation remain green.",
+        "No StateHash implementation is introduced until this encoder and ADR-009 are accepted."
+      ],
+      "cycle_id": "CYCLE-000045",
+      "must_preserve": [
+        "INV-22 canonical-byte equality across logically equal states and construction paths.",
+        "Strict prohibition on Math.random, Date, external entropy, locale-sensitive ordering, JSON serialization of canonical state, and floating-point-dependent canonical behavior.",
+        "Existing package dependency boundaries and public APIs unrelated to canonical encoding.",
+        "All accepted monorepo bootstrap, TypeScript, ESLint, and CI behavior."
+      ],
+      "objective": "Deliver an accepted canonical encoder whose admitted-value validation and traversal cannot execute user-controlled code and whose behavior is independent of post-import global monkeypatching.",
+      "out_of_scope": [
+        "StateHash implementation or hash-function selection.",
+        "RNG, branded numeric types, ledger, price generation, replay CLI, Electron scaffolding, UI, and installers.",
+        "Adding new admitted container types beyond those required by CICLO_SPEC.md.",
+        "Changing CICLO_SPEC.md or weakening any locked invariant.",
+        "Unrelated workspace, lint, dependency-boundary, or CI refactoring."
+      ],
+      "required_adrs": [
+        "ADR-009"
+      ],
+      "required_tests": [
+        "Golden-vector tests for every admitted scalar and container form and every ADR-defined boundary value.",
+        "Construction-order and insertion-order tests demonstrating byte-identical canonical output for logically equal states.",
+        "Hostile Proxy tests covering ownKeys, getOwnPropertyDescriptor, getPrototypeOf, get, and iterator-related traps, each asserting CanonicalEncoderError and zero trap-handler invocations.",
+        "Hostile array tests covering index accessors, non-data descriptors, sparse or extra-key cases governed by ADR-009, and Proxy-wrapped arrays.",
+        "Hostile Set tests covering overridden Symbol.iterator, relevant instance overrides, subclasses, and Proxy-wrapped Sets, each with user-code invocation sentinels.",
+        "Post-import monkeypatch tests for every captured mutable global used by the encoder, explicitly including Number.isNaN and Number.isInteger.",
+        "Deterministic rejection tests asserting the documented CanonicalEncoderError classification for unsupported, accessor-bearing, subclassed, or proxied values.",
+        "Run the repository's full test, lint, typecheck, dependency-boundary, and CI-equivalent validation commands."
+      ],
+      "scope": [
+        "Create ADR-009 defining the complete canonical byte format, admitted scalar and container types, ordering rules, rejection rules, and the rule that validation and traversal use only module-private captured intrinsics and own data-descriptor values.",
+        "Implement CanonicalEncoder in the specification-authorized package without reusing rejected user-reachable traversal paths.",
+        "Capture every determinism- or validation-sensitive intrinsic at module initialization, including numeric predicates and bounds, object reflection operations, container brand checks, constructors, and the exact Set traversal primitive used by the implementation.",
+        "Reject unsupported values, accessors, subclasses or overridden container behavior, and Proxy-wrapped containers with CanonicalEncoderError before any user-defined getter, iterator, method, or Proxy trap handler executes.",
+        "Canonicalize supported Set and array contents through the ADR-defined ordering and descriptor-based traversal rules.",
+        "Add focused regression tests for hostile accessors, overridden iterators, subclasses, proxies, mutable globals, construction-order independence, and deterministic error behavior."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §3 ADR-009",
+        "CICLO_SPEC.md §15 FASE-1 acceptance",
+        "CICLO_SPEC.md §19",
+        "INV-22",
+        "BENCHMARK.md task review and acceptance requirements"
+      ],
+      "task_id": "TASK-0005",
+      "title": "Complete ADR-009 and harden CanonicalEncoder traversal"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0005",
+  "title": "Complete ADR-009 and harden CanonicalEncoder traversal"
+}

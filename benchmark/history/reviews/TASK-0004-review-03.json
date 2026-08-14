@@ -1,0 +1,109 @@
+{
+  "created_at": "2026-08-14T03:21:26.373513+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 exists under docs/decisions and specifies enough byte-level detail, including type tags and framing, for an independent implementation to reproduce identical bytes.",
+        "evidence": "docs/decisions/0009-canonical-encoder.md defines the CE1 envelope, unsigned LEB128 framing, tags 0x00–0x09, per-type bodies, UTF-8 behavior, container semantics, ordering, and errors.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The implementation contains no encoding decision absent from ADR-009; ADR-009 is committed in the same change before or with code depending on it.",
+        "evidence": "ADR-009 requires immunity to post-import mutation of ambient built-ins, but encodeUtf8 dynamically calls input.charCodeAt and ByteBuffer.writeVarint dynamically calls Math.floor. Those runtime dependencies are neither captured nor covered by the ADR's explicit intrinsic list.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Logically equal supported objects encode to byte-identical output regardless of property insertion order.",
+        "evidence": "Object entries are sorted by encoded key bytes, and permutation tests cover ordinary and numeric-looking keys.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Object keys are ordered by their UTF-8 byte sequences using a locale-independent comparison; tests include keys for which locale or UTF-16 ordering would give a different result.",
+        "evidence": "compareUnsignedBytes performs unsigned bytewise comparison; tests cover U+FF00 versus U+1F600 and \"b\" versus \"ä\".",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Safe integers use a type marker distinct from bigint; non-integer numbers and integers outside Number safe-integer bounds are rejected deterministically.",
+        "evidence": "Tags 0x03 and 0x04 are distinct, and tests cover fractional values and both safe-integer boundaries.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Bigints use the ADR-defined signed decimal ASCII representation with an explicit sign and cannot collide with safe-integer encodings.",
+        "evidence": "encodeBigIntBody emits an explicit '+' or '-' and tests cover zero, signed values, and values beyond Number.MAX_SAFE_INTEGER.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "undefined, NaN, positive and negative Infinity, and negative zero each produce an explicit deterministic error and are never normalized.",
+        "evidence": "Dedicated rejection branches and tests cover all listed prohibited numeric values and undefined in top-level and nested positions.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Ordered collections preserve element order; every supported unordered collection is canonicalized using the exact sorting rule recorded in ADR-009.",
+        "evidence": "Arrays encode index order, while Set elements are independently encoded and sorted with compareUnsignedBytes; order-sensitive and insertion-permutation tests pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Changing encodingVersion changes the canonical byte sequence for the same supported value.",
+        "evidence": "The UTF-8 version is length-framed in the envelope, and the ce1/ce2 test asserts different bytes.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The encoder does not read time, randomness, locale, environment, filesystem, network, or mutable global state.",
+        "evidence": "packages/core/src/canonical-encoder.ts reads mutable String.prototype.charCodeAt through input.charCodeAt and mutable Math.floor during each encoding invocation. Post-import monkeypatching can therefore change output or failure behavior for identical arguments.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "No StateHash API or finalTick-specific behavior is introduced by this change.",
+        "evidence": "The changed API only exposes canonical encoding metadata, types, errors, and canonicalEncode; no StateHash or finalTick logic appears in the candidate.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository lint, strict typecheck, dependency-boundary checks, and all pre-existing tests pass.",
+        "evidence": "Automated validation reports npm test and lint passing with 138 tests and no skips; pretest runs strict compilation. The implementer also reports npm run boundary passing for all workspace packages.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "encodeUtf8 invokes input.charCodeAt(i) and input.charCodeAt(i + 1), resolving String.prototype.charCodeAt at call time. ByteBuffer.writeVarint invokes Math.floor at call time. A caller can replace either function after module import, causing identical supported arguments to produce different bytes, raw errors, or nontermination. The monkeypatch suite tests many captured intrinsics but omits these actual dependencies.",
+        "id": "REVIEW-001",
+        "required_change": "Remove or capture every behavior-affecting ambient built-in lookup used during encoding, including String.prototype.charCodeAt and Math.floor, using module-private immutable references or equivalent operator-only logic. Reconcile ADR-009's intrinsic-capture requirements with the complete implementation dependency set, and add post-import mutation regression tests demonstrating unchanged exact bytes and rejection behavior.",
+        "severity": "MAJOR",
+        "title": "Mutable ambient built-ins remain in encoding paths"
+      }
+    ],
+    "invariants_checked": [
+      "INV-22 canonical equality and insertion-order independence",
+      "Distinct safe-integer and bigint encodings",
+      "UTF-8 bytewise object-key ordering",
+      "Ordered Array versus unordered Set semantics",
+      "Explicit prohibited-value rejection",
+      "Cycle rejection with shared acyclic references allowed",
+      "encodingVersion participation",
+      "No StateHash or finalTick behavior",
+      "Pure-package dependency boundary",
+      "Public metadata mutation does not alter tag or magic bytes"
+    ],
+    "risks": [
+      "Canonical bytes can currently depend on mutable process-global state after module import.",
+      "Monkeypatching Math.floor can corrupt multi-byte varints or cause nontermination, while monkeypatching String.prototype.charCodeAt can corrupt any string, key, or encodingVersion bytes."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The byte grammar and core canonicalization behavior are substantially complete, but the encoder still performs mutable ambient built-in lookups during encoding, violating ADR-009's determinism rule and the task's purity requirement.",
+    "task_id": "TASK-0004",
+    "validation_assessment": {
+      "missing": [
+        "Regression validation for post-import mutation of String.prototype.charCodeAt and Math.floor, followed by the full lint, strict compile, boundary, and test gates"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 3,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0004"
+}

@@ -1,0 +1,64 @@
+{
+  "attempt": 3,
+  "created_at": "2026-08-14T03:19:52.681082+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "changed_files": [
+      "docs/decisions/0009-canonical-encoder.md",
+      "packages/core/src/canonical-encoder.ts",
+      "tests/canonical/encoder.test.mjs"
+    ],
+    "findings": [
+      {
+        "finding_id": "REVIEW-001",
+        "resolution": "Rewrote canonical-encoder.ts around descriptor-based traversal and prototype-exact admission. Array elements are read via Reflect.getOwnPropertyDescriptor (no [[Get]] traps, no getter invocation, accessor descriptors rejected as E_ACCESSOR_PROPERTY, missing descriptors as E_UNDEFINED). Sets iterate via captured Set.prototype.values and captured %SetIteratorPrototype%.next, so instance Symbol.iterator/values overrides are ignored. Uint8Array admission requires exact %Uint8Array.prototype% and its byte copy is materialised through captured %TypedArray.prototype.slice%. Subclasses of Array/Set/Uint8Array are rejected with E_UNSUPPORTED_TYPE. Every intrinsic inspection call is wrapped in safe helpers that convert unexpected throws (e.g., from a revoked Proxy or a throwing trap) to E_UNSUPPORTED_TYPE. ADR-009 §5 and §9 were updated to codify this admitted-container model and forbid user-code invocation. Regression tests added: Set/Array/Uint8Array subclass rejection, overridden Set Symbol.iterator/values ignored, array index accessor rejection, sparse array rejection, Proxy over array with no [[Get]] traps triggered, Proxy ownKeys/getOwnPropertyDescriptor/getPrototypeOf traps yielding deterministic bytes, revoked proxy at top level and nested rejected as E_UNSUPPORTED_TYPE, and proxies whose inspection traps throw.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-002",
+        "resolution": "All behavior-defining built-ins are now captured at module initialization into module-private const bindings: Number.isNaN/isInteger/MAX_SAFE_INTEGER/MIN_SAFE_INTEGER/POSITIVE_INFINITY/NEGATIVE_INFINITY/prototype.toString, Object.is/getPrototypeOf/prototype, Reflect.ownKeys/getOwnPropertyDescriptor/apply, Array.isArray/prototype/prototype.sort, Set/prototype/prototype.has/add/delete/values plus %SetIteratorPrototype%.next, Uint8Array/prototype/from and %TypedArray.prototype.slice%/set%, BigInt.prototype.toString. Encoder invokes them via captured Reflect.apply (avoiding late Function.prototype.call lookup), never via property lookup on the current global value. Direct index assignment replaces Array.prototype.push where used. ADR-009 §9 was updated to list the captured intrinsics and mandate immunity to post-import mutation. Regression tests monkeypatch each of the listed built-ins after import and assert byte-identical output and unchanged rejection codes.",
+        "status": "RESOLVED"
+      }
+    ],
+    "notes_for_reviewer": [
+      "ADR-009 §5 tightens the admitted-container model to prototype-exact (Array/Set/Uint8Array subclasses are now rejected). This is a change in the specification's admission surface required to make REVIEW-001 implementable without invoking user code; the earlier text 'v instanceof Set' / 'Array.isArray(v)' was insufficient because subclasses inherit but can override iteration/indexed access.",
+      "Proxy inspection traps (ownKeys, getOwnPropertyDescriptor, getPrototypeOf) may still be invoked by ECMAScript's internal methods when Reflect.* is called on a Proxy candidate. ADR-009 §9 clause 6 explicitly documents this and requires the encoder to (a) treat identical trap return values deterministically and (b) convert any throw from such an inspection call to E_UNSUPPORTED_TYPE. No user [[Get]] handler, no getter/setter, no instance Symbol.iterator, and no user-defined typed-array indexed accessor can run during encoding of an admitted value.",
+      "Revoked proxies are now caught in every inspection helper (safeGetPrototypeOf, safeReflectOwnKeys, safeGetDescriptor, safeIsArray, copyUint8ArrayViaIntrinsic, collectSetValuesViaIntrinsic) and surfaced as E_UNSUPPORTED_TYPE with a path.",
+      "Set/Array method captures include has/add/delete and sort, and Uint8Array captures include from/slice/set — this closes the writable/configurable data-property monkeypatch surface that reviewer REVIEW-002 flagged. Node's non-writable non-configurable intrinsics (e.g., %TypedArray.prototype.length%, Number.MAX_SAFE_INTEGER) are captured as values for defensiveness even though they cannot be swapped.",
+      "No production code path outside canonical-encoder.ts changed. packages/core/src/index.ts and package.json diffs are pre-existing from earlier iterations (public re-exports and tests script)."
+    ],
+    "remaining_issues": [],
+    "review_iteration": 2,
+    "status": "COMPLETED",
+    "summary": "Reworked CanonicalEncoder to satisfy both review findings. All admitted-container inspection now goes through captured trusted intrinsics and descriptor-based traversal — proxies, subclasses, and post-import monkeypatches can no longer influence encoded bytes or cause raw exceptions to leak. ADR-009 §5 and §9 were updated to define the exact admission model (prototype-exact for Array/Set/Uint8Array) and the intrinsics capture contract. 34 new tests cover Proxy inspection traps, revoked proxies, Set/Array/Uint8Array subclasses, overridden Set iterators, array index accessors, and monkeypatch resilience for every listed built-in. Lint, strict typecheck, dependency boundary, and all 138 tests pass.",
+    "task_id": "TASK-0004",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "Strict tsc -b succeeds across all workspaces."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "ESLint --max-warnings=0 clean across the repo."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "15 workspace packages validated against §14.5 dependency boundaries."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "138 tests pass (was 104): 94 canonical encoder tests including 34 new REVIEW-001/002 regression tests, plus config/lint/boundary suites; 0 fail, 0 skip."
+      },
+      {
+        "command": "node --test tests/canonical/encoder.test.mjs",
+        "result": "PASS",
+        "summary": "All 94 canonical encoder tests pass, covering golden vectors, permutations, UTF-8 ordering, rejections, cycles, Proxy inspection traps, subclass rejections, revoked proxies, overridden Set iteration, and monkeypatch immunity for every captured built-in."
+      }
+    ]
+  },
+  "task_id": "TASK-0004"
+}
