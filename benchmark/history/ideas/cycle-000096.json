@@ -1,0 +1,151 @@
+{
+  "created_at": "2026-08-14T11:22:21.633529+00:00",
+  "cycle_id": "CYCLE-000096",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "packages/core exports branded bigint types Money, Quantity, Price, Rate with constructors that reject non-bigint, non-integer, and out-of-safe-range inputs",
+          "packages/core exports branded number type Tick with constructor rejecting non-integer and values outside [-(2^53-1), 2^53-1]",
+          "Constants QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n exported as bigint literals",
+          "Division helper exported requiring an explicit rounding mode enum (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN); calling without mode is a compile-time error",
+          "Property test: Tick does not exceed 2^53-1 over a simulated 10-year replay (INV-23)",
+          "All existing lint, boundary, and canonical-encoder tests remain green; npm run compile exits 0"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "§4 Glossário travado",
+          "§15 FASE-1: core completo. Aritmética inteira",
+          "INV-23",
+          "§13 proibições verificáveis por lint"
+        ],
+        "title": "Implement core branded arithmetic types and division modes",
+        "why_now": "FASE-1 requires 'core completo. Aritmética inteira' as its first scope item. With the CanonicalEncoder now accepted (TASK-0009), branded types are the next unblocked foundational piece. ADR-003 specifies Money, Quantity, Price, Rate as bigint branded types and Tick as a safe-integer branded number. ADR-004 requires a division helper that enforces explicit rounding mode at the call site. These are prerequisites for every downstream package: world (price generator), domain (ledger, orders, margin), and application (tick loop). They have no dependencies on the hash function ADR and can be implemented immediately."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/NNNN-hash-function.md committed with status: accepted",
+          "ADR specifies the chosen algorithm bit-by-bit (e.g. SplitMix64 over FNV-1a accumulator) with all constants, bit widths, and mixing steps",
+          "ADR explains exactly how masterSeed (string), namespace (string), and variadic coordinate integers are combined into a single input before hashing",
+          "ADR states the output domain (uint64-equivalent) and how it maps to bigint or pair of safe integers",
+          "ADR confirms algorithm is not the native JS/V8 hash function",
+          "No implementation code introduced in this task"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "§19 lacunas conhecidas: função de hash",
+          "§15 FASE-1: rng posicional",
+          "INV-02",
+          "INV-12"
+        ],
+        "title": "Write ADR for positional hash function (DEFINIR item from ADR-002)",
+        "why_now": "ADR-002 is TRAVADA and explicitly requires the hash function to be 'especificada bit a bit em ADR' before implementation. This is listed in §19 lacunas conhecidas as an expected DEFINIR resolution. Without the ADR, rand(masterSeed, namespace, ...coordinates) cannot be correctly implemented or reviewed, which blocks the price generator and all world simulation. The ADR is documentation-only and has no dependencies, so it can be written in parallel with IDEA-001 or immediately after."
+      },
+      {
+        "acceptance_targets": [
+          "packages/core exports pure function rand(masterSeed: string, namespace: string, ...coordinates: number[]): bigint returning a value in [0, 2^64)",
+          "Pure function: identical inputs always return identical output; no mutable generator state",
+          "Namespace isolation: rand(s, 'market.trend', 0, 0) !== rand(s, 'market.factor', 0, 0) for any s (probabilistically verified across 1000 seeds)",
+          "Implementation matches the chosen algorithm from IDEA-002 ADR bit-for-bit",
+          "No Math.random(), no stateful PRNG, no native crypto hash",
+          "All existing gates green; npm run compile exits 0"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-03",
+          "INV-12",
+          "§5.1 Construção do preço",
+          "§15 FASE-1: rng posicional"
+        ],
+        "title": "Implement positional RNG: rand(masterSeed, namespace, ...coordinates)",
+        "why_now": "INV-02 — 'consultar price(asset, t) diretamente é igual a chegar em t avançando tick por tick' — is described in §3 ADR-002 as the most important test in the project, and it depends entirely on the positional RNG. Every price-generation namespace (market.trend, market.factor, market.regime, macro.schedule, etc.) routes through rand(). FASE-1 requires 'rng posicional' as an explicit scope item. This task is unblocked once the hash function ADR (IDEA-002) is accepted."
+      },
+      {
+        "acceptance_targets": [
+          "packages/world exports worldPrice(masterSeed: string, assetId: AssetId, tick: Tick): Price using trendLayer and idiosyncraticNoise octave layers",
+          "Supports ORB and NEXA as specified in §4",
+          "worldPrice(asset, t) called directly equals tick-by-tick traversal for any t and both assets (INV-02)",
+          "Player actions do not alter worldPrice: same masterSeed and tick always return same Price (INV-03)",
+          "No floating-point arithmetic; all intermediate calculations use bigint or safe integer (ADR-003); no Math.sin/cos/exp/log/pow",
+          "Octave count, periods, and amplitudes committed to a versioned configuration file; ADR registered for these parameters before code merges",
+          "All existing gates green; npm run compile exits 0"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 Construção do preço",
+          "ADR-002",
+          "ADR-003",
+          "ADR-005",
+          "§15 FASE-1: Gerador de preço com duas camadas de ruído e dois ativos",
+          "INV-02",
+          "INV-03",
+          "§13 proibições verificáveis por lint"
+        ],
+        "title": "Implement two-asset two-octave price generator in packages/world",
+        "why_now": "FASE-1 scope explicitly requires 'Gerador de preço com duas camadas de ruído e dois ativos'. This is the minimum world simulation needed to drive the tick loop, the ledger, and the minimal UI chart. ADR-005 defines the tick base as a single point value (no OHLC), and §5.1 defines the layered log-space construction. Two octave layers (trendLayer and idiosyncraticNoise) over two assets (ORB and NEXA) are the minimum viable price signal. This work is blocked only by branded types (IDEA-001) and the positional RNG (IDEA-003)."
+      },
+      {
+        "acceptance_targets": [
+          "electron-builder produces a working installer for Windows (.exe or .msi) and Linux (.deb or .AppImage) from the CI matrix",
+          "Installer opens a window (may be blank or minimal) without crashing",
+          "Electron main process config has contextIsolation: true, nodeIntegration: false, sandbox: true, no webSecurity: false in any configuration including development",
+          "Preload exposes only a typed allowlist of channels via contextBridge; no generic invoke(channel, args) channel",
+          "INV-29 audit script passes against the packaged build",
+          "apps/desktop/main, preload, and renderer stubs wire together with typed IPC contracts in packages/contracts"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.1 Stack travada: Electron, electron-builder",
+          "§14.2 Topologia de processos",
+          "§14.6 Empacotamento e plataformas",
+          "§15 FASE-1 aceite: Instalador mínimo para Windows e Linux produzido pelo CI",
+          "INV-29",
+          "§17 Gate de CI item 7 e item 8"
+        ],
+        "title": "Minimal Electron installer for Windows and Linux (FASE-1 requirement)",
+        "why_now": "§14.6 states 'o instalador existe na FASE-1, em forma mínima. Não no fim.' The spec explicitly warns that deferring multi-platform packaging to a later phase means discovering ABI and module-native issues in the final week when there is no time to fix architecture. The current apps/desktop/* sub-apps are stubs. INV-29 (contextIsolation, nodeIntegration: false, sandbox) must be wired from the first installer. This work has no dependency on core arithmetic or the price generator and can proceed in parallel."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Two tasks accepted in total: TASK-0002 (monorepo scaffold, checkpoint-0007) and TASK-0009 (CanonicalEncoder + ADR-009, checkpoint-0035). packages/core contains canonical-encoder.mts and its index only; all other packages (world, domain, application, contracts, adapters, narrative, ui) are empty stubs exporting {}. Only one ADR document exists (0009-canonical-encoding.md). No branded arithmetic types, no hash function ADR, no positional RNG, no price generator, no ledger, no tick loop, no save/replay system, no installer, and no UI exist anywhere in the codebase.",
+      "highest_priority_gap": "core branded arithmetic types (Money, Quantity, Price, Rate, Tick) and division modes (ADR-003, ADR-004) are the next unblocked FASE-1 deliverable. They are prerequisites for every downstream package and have no remaining dependencies now that the CanonicalEncoder is accepted."
+    },
+    "warnings": [
+      "The hash function ADR (DEFINIR item from ADR-002) has not been written. ADR-002 is TRAVADA and explicitly requires the algorithm to be specified bit-by-bit in an ADR before any implementation of rand(). Implementing the positional RNG without a prior ADR risks the same multi-cycle review rejection pattern seen with the CanonicalEncoder before ADR-009 was written.",
+      "The minimal installer is a FASE-1 acceptance criterion, not a later-phase item. §14.6 states the requirement explicitly and warns that deferral causes ABI and module-native failures in the final week. The longer this is deferred within FASE-1, the higher the integration risk for multi-platform CI.",
+      "INV-29 (Electron security: contextIsolation, nodeIntegration: false, sandbox) has no test coverage and no configured CI audit step yet. The gate in §17 item 8 requires this audit to be blocking before FASE-1 can close."
+    ]
+  }
+}

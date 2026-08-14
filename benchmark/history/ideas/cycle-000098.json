@@ -1,0 +1,161 @@
+{
+  "created_at": "2026-08-14T11:29:01.525043+00:00",
+  "cycle_id": "CYCLE-000098",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Branded types Money, Quantity, Price, Rate as bigint newtype exports from packages/core/src/index.mts",
+          "Branded type Tick as safe-integer number newtype export",
+          "Scale constants QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n exported as const bigint",
+          "Constructor/guard for each type rejects wrong brand, non-integer, and out-of-safe-range values at compile time and runtime",
+          "TypeScript compiler under strict mode rejects cross-brand assignment without explicit constructor",
+          "Property test: Tick constructor rejects values above 2^53-1 (INV-23)",
+          "npm run compile exits 0; all existing 101 tests continue to pass; lint and boundary check green"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003 §3",
+          "§4 glossário travado — Money, Quantity, Price, Rate, Tick definitions",
+          "§14.1 TypeScript nominal types mandatory; no any, no type assertion without ADR",
+          "INV-23 Tick must not exceed 2^53-1 in a ten-year replay",
+          "§15 FASE-1: core completo. Aritmética inteira"
+        ],
+        "title": "Implement nominal types and scale constants in packages/core",
+        "why_now": "The CanonicalEncoder is the only substantive code in core. ADR-003 (TRAVADO) precisely specifies Money, Quantity, Price, Rate as branded bigint types and Tick as a branded safe-integer number. No DEFINIR decision affects these definitions. Every other FASE-1 package — domain (ledger, entries), world (Price output), application (tick loop), contracts (DTOs) — is blocked at the type level until these exist. They are the shallowest dependency with the widest fan-out and have no external blockers."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed in docs/decisions/ specifying the chosen algorithm (e.g. SplitMix64 over FNV-1a accumulator) bit-by-bit with arithmetic constants, bit widths, mixing steps, and TypeScript representation of uint64 output",
+          "rand(masterSeed: bigint, namespace: string, ...coordinates: number[]): bigint exported from packages/core returning a value in [0, 2^64)",
+          "Determinism test: identical (masterSeed, namespace, coordinates) always returns identical value",
+          "Namespace isolation test: rand with 'market.trend' and 'market.factor' at identical coordinates produce statistically distinct series over 10_000 samples",
+          "No Math.random, Date, performance, crypto, or platform RNG used anywhere in implementation",
+          "npm run compile exits 0; all existing tests pass; lint and boundary check green"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002 DEFINIR — hash function must be specified bit-by-bit, not native hash",
+          "§5.1 all price layers are positional (trendLayer, idiosyncraticNoise per octave+block index)",
+          "§5.2 macro.schedule and macro.payload namespaces",
+          "§5.3 bot.policy and bot.decision namespaces",
+          "INV-02 direct tick query equals sequential tick-by-tick advance",
+          "INV-12 no identifier generated in domain depends on external entropy",
+          "§15 FASE-1: rng posicional"
+        ],
+        "title": "Write ADR-002 and implement deterministic positional RNG in packages/core",
+        "why_now": "ADR-002 is TRAVADO and requires the hash function to be specified bit-by-bit in an ADR and prohibits the native language hash. This is an explicit DEFINIR listed in §19 lacunas conhecidas. INV-02 ('consultar price(asset,t) diretamente é igual a chegar em t avançando tick por tick') is described in the spec as the most important test of the project, and it depends entirely on the positional RNG being stateless and indexable. All six world namespaces (market.trend, market.factor, market.regime, macro.schedule, bot.policy, bot.decision) are blocked until rand() exists."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed in docs/decisions/ documenting modes TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN and the chosen enforcement mechanism (lint rule, type-level marker, or required parameter shape)",
+          "divTruncate(dividend: bigint, divisor: bigint): {quotient: bigint, remainder: bigint} exported from packages/core",
+          "divHalfUp and divHalfEven with identical signatures exported",
+          "Invariant: quotient * divisor + remainder === dividend for all three modes at positive, negative, and exact-midpoint boundary values",
+          "Calling / directly on Money, Quantity, Price, or Rate values is rejected by the chosen enforcement mechanism — demonstrated by a failing test fixture or compile error",
+          "No floating-point literals or Math functions in implementation",
+          "npm run compile exits 0; all existing tests pass; lint and boundary check green"
+        ],
+        "category": "architecture",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-004 DEFINIR — technical enforcement mechanism must be decided before implementation",
+          "ADR-003 §3 — division operator / prohibited on Money, Quantity, Price, Rate",
+          "§6 world:rounding_residue:<COMMODITY> absorbs every rounding loss",
+          "INV-07 no rounding operation loses value; residue is accounted to rounding_residue",
+          "§7 fee incides on notional; notional requires (Quantity * Price) / (QUANTITY_SCALE * PRICE_SCALE) in bigint"
+        ],
+        "title": "Write ADR-004 and implement bigint division helpers in packages/core",
+        "why_now": "ADR-004 is TRAVADO: every operation that loses precision must declare its rounding mode explicitly, and calling division without a mode is mandated to be a compile-time or lint-blocking error. The technical enforcement mechanism is an open DEFINIR. The domain ledger cannot implement spot execution, fee calculation, or rounding residue posting (INV-07) without these helpers. Leaving this unresolved allows implicit division to proliferate in domain stubs before the enforcement mechanism is in place."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction, Entry, Account types defined in packages/domain using branded types from packages/core",
+          "Each Entry has an explicit commodity field; an Entry without commodity is a TypeScript type error",
+          "post(transaction) validates per-commodity zero-sum balance before applying; rejects unbalanced transactions with a typed error",
+          "Minimum account set implemented as string-typed identifiers matching §6",
+          "Spot market buy and spot market sell operations post the four required entries (BRL and asset legs) in a single balanced Transaction",
+          "Property test: 1000 randomly constructed valid Transactions satisfy INV-04 (per-commodity zero-sum)",
+          "Property test: BRL balance sum across all accounts remains zero after any sequence of valid spot Transactions (INV-05)",
+          "Ledger entries are immutable after posting; no mutation path through exported API",
+          "packages/domain imports only packages/core; boundary check passes (INV-26)"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 dupla entrada obrigatória; balanceamento por commodity separadamente",
+          "§6 minimum account set: world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, world:insurance_fund, player:cash:BRL, player:spot:<ASSET>, venue:fees, venue:realized_pnl, venue:liquidation_penalty, venue:funding",
+          "§6 Transaction carries tick, sequence, kind, causationId; no orphan transaction",
+          "INV-04 per-commodity sum is exactly zero for every Transaction",
+          "INV-05 BRL balance sum across all accounts is zero at every tick",
+          "INV-06 per-asset quantity sum is zero at every tick",
+          "INV-07 rounding residue accounts for every truncation",
+          "§15 FASE-1: Ledger multi-commodity de dupla entrada; Ordem a mercado, compra e venda spot"
+        ],
+        "title": "Implement domain double-entry ledger in packages/domain",
+        "why_now": "FASE-1 scope requires 'Ledger multi-commodity de dupla entrada' and 'Ordem a mercado, compra e venda spot'. INV-04 (per-commodity zero-sum in every Transaction), INV-05 (BRL sum always zero), and INV-06 (per-asset quantity sum always zero) are all FASE-1 acceptance gates. The ledger is the foundation for every domain operation — spot buy, sell, fee posting, rounding residue — and must precede the tick loop and the StateHash. Once core nominal types and division helpers exist, no DEFINIR blocks ledger implementation."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed documenting the fixed-point strategy for log-space price accumulation with cross-platform bit-identical guarantee",
+          "Octave count, block periods, and amplitudes for ORB and NEXA placed in a versioned configuration file; changing any parameter invalidates the hash",
+          "price(assetId: AssetId, tick: Tick): Price implemented in packages/world using only rand() calls and integer arithmetic; no floating-point literals, no transcendental Math calls",
+          "INV-02 property test: price(asset, t) computed directly equals price reached by advancing tick-by-tick for 100 randomly chosen (asset,t) pairs including t > 500_000",
+          "INV-03 property test: two calls with identical (masterSeed, assetId, tick) but different external state return identical Price",
+          "packages/world imports only packages/core; boundary check passes (INV-26)",
+          "npm run compile exits 0; all existing tests pass; lint and boundary check green"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "high",
+        "spec_refs": [
+          "§5.1 logPrice(asset,tick) construction — trendLayer, idiosyncraticNoise, each as octave sum of positional samples",
+          "ADR-003 §3 — Math.sin, Math.cos, Math.exp, Math.log, Math.pow prohibited; fixed-point or lookup-table required",
+          "ADR-005 §3 — tick-base price is a single point, no OHLC",
+          "§5.1 DEFINIR — octave count, periods, amplitudes in versioned config",
+          "INV-02 price(asset,t) direct equals tick-by-tick advance for any t",
+          "INV-03 player actions do not alter worldPrice series",
+          "INV-26 world imports only core",
+          "§15 FASE-1: gerador de preço com duas camadas de ruído e dois ativos"
+        ],
+        "title": "Implement world price generator (two assets, two noise layers) in packages/world",
+        "why_now": "FASE-1 acceptance requires 'gerador de preço com duas camadas de ruído e dois ativos'. This is the primary consumer of the positional RNG and the entry point to INV-02 (direct tick query equals sequential advance), which is explicitly described as the most important test in the project. Two open DEFINIR decisions must be resolved as part of this task: octave parameters and block periods in a versioned config file (§5.1), and the fixed-point or lookup-table strategy for log-space price construction (transcendental Math functions are banned by §13 and ADR-003 in all pure packages). These ADRs must be written before the implementation merges."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo infrastructure is complete: CI pipeline, ESLint purity rules, dependency boundary checker, workspace config, and all package stubs exist. packages/core exports CanonicalEncoder (ADR-009 accepted, 101 tests passing). One ADR is on file (0009-canonical-encoding.md). Every other package — world, domain, application, narrative, contracts, adapters, ui, and all apps/desktop sub-packages — is an empty stub exporting nothing. No nominal types, no positional RNG, no ledger, no price generator, no tick loop, no save system, no CLI replay tool, no benchmark tool, no minimal UI, no installer exists anywhere in the repository.",
+      "highest_priority_gap": "packages/core is missing the three foundational primitives that every downstream FASE-1 package depends on: (1) branded arithmetic types Money, Quantity, Price, Rate, Tick specified in ADR-003; (2) deterministic positional RNG rand() required by ADR-002 and the world price generator; (3) bigint division helpers with explicit rounding modes required by ADR-004 and the domain ledger. Without these, domain, world, and application all remain unimplementable at the type level."
+    },
+    "warnings": [
+      "No tasks have been accepted since checkpoint-0035 (one accepted task). Checkpoints 0034, 0036 and the current cycle-000098 show NO_ACCEPTED_CHANGES. The proposals in cycle-000093 match this cycle's proposals exactly because the repository state is unchanged. If the same proposals are rejected again, the block is in the Builder or Reviewer role, not in this analysis.",
+      "Three DEFINIR decisions remain simultaneously unresolved: (a) hash function algorithm for ADR-002 (positional RNG), (b) technical enforcement mechanism for division rounding mode (ADR-004), and (c) fixed-point or lookup-table strategy for log-space price construction plus octave parameters (§5.1). Each blocks a distinct FASE-1 delivery chain. They should be resolved in parallel, not sequentially, to avoid compressing the critical path.",
+      "FASE-1 acceptance requires a minimal installer for Windows and Linux ('instalador mínimo existe na FASE-1, em forma mínima. Não no fim', §14.6 TRAVADO). No work on Electron setup, preload, renderer, or electron-builder packaging has been started. The spec warns explicitly that deferring this risks ABI failures and native module rebuild issues in the final week. This risk accumulates every cycle this work is postponed."
+    ]
+  }
+}

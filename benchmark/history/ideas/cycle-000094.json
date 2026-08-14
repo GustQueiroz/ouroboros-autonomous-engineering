@@ -1,0 +1,146 @@
+{
+  "created_at": "2026-08-14T11:16:08.494800+00:00",
+  "cycle_id": "CYCLE-000094",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate exported from packages/core as branded bigint types",
+          "Tick exported as branded safe-integer number type",
+          "Constructors reject non-integer, NaN, Infinity, -0, and values outside [-(2^53-1), 2^53-1] where applicable",
+          "No bare number arithmetic on branded types compiles without explicit cast",
+          "INV-23 property test: no safe-integer value overflows 2^53 in a representative operation sequence",
+          "Lint gate remains green"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "§14.1 Stack travada",
+          "§4 Glossário travado",
+          "INV-23"
+        ],
+        "title": "Branded integer types and nominal arithmetic in core",
+        "why_now": "Every downstream package (world, domain, application) requires Money, Quantity, Price, Rate, and Tick as types before any economic logic can be written. ADR-003 defines these precisely with no unresolved DEFINIR blocking them. Implementing them now lets world and domain start with correct type constraints from the first line, preventing retroactive refactors."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ specifying the hash function bit-by-bit (e.g. SplitMix64 over FNV-1a accumulator)",
+          "rand(masterSeed, namespace, ...coordinates) implemented in packages/core with all reserved namespaces from ADR-002 table",
+          "Positional invariant test: rand result at coordinates (ns, a, b) is identical whether called directly or reached after any number of other rand calls",
+          "INV-12 test: no call to Math.random, Date, or external entropy in any pure package",
+          "Lint gate remains green"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-12",
+          "§5.1 Construção do preço",
+          "§19 Protocolo de ambiguidade"
+        ],
+        "title": "ADR for hash function and positional RNG implementation in core",
+        "why_now": "The positional RNG is the dependency gate for the entire world package. Price generation, macro events, bot decisions, and NPC tips all require rand(masterSeed, namespace, ...coordinates). ADR-002 mandates the hash function be specified bit-by-bit in an ADR before any implementation exists — that ADR has not been written. Without it, world cannot begin."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ specifying the enforcement mechanism (e.g. typed helper function whose mode parameter is a required enum)",
+          "divideBI(a: bigint, b: bigint, mode: RoundingMode): bigint and divideSI(a: number, b: number, mode: RoundingMode): number exported from packages/core",
+          "TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN modes implemented and tested with boundary cases",
+          "Lint rule or type-level mechanism blocks bare / operator on Money/Quantity/Price/Rate/Tick types",
+          "INV-07 coverage: rounding residue is nonzero and correctly signed in unit tests that truncate"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-004",
+          "INV-07",
+          "§13 Proibições verificáveis por lint",
+          "§16 Definition of Done"
+        ],
+        "title": "ADR for division mode enforcement and typed division helpers in core",
+        "why_now": "ADR-004 requires every division to declare a rounding mode and mandates that calling division without a mode is a compile-time or lint-time error. The enforcement mechanism is marked DEFINIR. The ledger and price computation layers will use division; establishing the mechanism before those layers are written prevents a retroactive audit of every division site."
+      },
+      {
+        "acceptance_targets": [
+          "computeStateHash(state: CanonicalValue): StateHash exported from packages/core using CanonicalEncoder output fed into the hash function from IDEA-002",
+          "computeSaveHash(envelope: CanonicalValue): SaveHash exported separately; the two types are nominally distinct and cannot be compared without explicit conversion",
+          "finalTick is excluded from StateHash input; test demonstrates two saves identical in seed and actions up to tick T but differing in finalTick produce the same StateHash at T",
+          "Text narrative fields are excluded from StateHash input by construction",
+          "INV-22 property test: logically equal states produce equal bytes; logically different states produce different bytes"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-009",
+          "INV-01",
+          "INV-22",
+          "§7 Ordem canônica do tick step 10",
+          "§17 Gate de CI item 5"
+        ],
+        "title": "StateHash implementation in core",
+        "why_now": "Step 10 of the locked canonical tick order emits a StateHash on every tick. INV-01 and INV-22 both depend on StateHash being defined and computable before any tick loop can be tested. The CanonicalEncoder (ADR-009) is complete; adding a deterministic hash over its output completes the measurement instrument required by the CI gate (replay of three reference runs with per-tick StateHash comparison)."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ registering octave count, block periods, and amplitude parameters for trendLayer and idiosyncraticNoise",
+          "price(assetId: AssetId, tick: Tick): Price implemented for ORB and NEXA in packages/world",
+          "All arithmetic in fixed-point bigint; no floating-point, no Math.sin/cos/exp",
+          "INV-02 test: price(asset, 9_000_000) called directly equals price obtained by iterating tick-by-tick to 9_000_000",
+          "INV-03 test: two sessions with same seed but different action logs produce identical worldPrice series",
+          "Performance: price(asset, tick) under 2µs at p95 per §18, validated by tools/bench calibration baseline"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 Construção do preço",
+          "ADR-002",
+          "ADR-003",
+          "ADR-005",
+          "INV-02",
+          "INV-03",
+          "§18 Orçamento de performance"
+        ],
+        "title": "World price generator: two assets and two noise layers",
+        "why_now": "FASE-1 explicitly requires a price generator with two noise layers and two assets. This is the first substantive module of packages/world and is the earliest point at which INV-02 and INV-03 can be tested with real numbers. It also requires resolving the DEFINIR for octave count, periods, and amplitudes, which must be documented in an ADR and stored in a versioned configuration file per §19."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "packages/core has a complete, tested CanonicalEncoder (ADR-009 written and accepted). All other packages — world, domain, application, narrative, contracts, adapters, ui, all four desktop app sub-packages, and all three tool packages — are empty stubs exporting nothing. Tooling is functional: boundary checker, determinism lint rules, and CI pipeline (compile, lint, boundary, test) are all wired and green. No Electron entry point, no installer config, no bundler config, and no implementation in world, domain, or application layers exists yet.",
+      "highest_priority_gap": "packages/core lacks the branded integer types (Money, Quantity, Price, Rate, Tick) required by ADR-003, the positional RNG required by ADR-002, and division helpers required by ADR-004. These three building blocks are the dependency gate for every subsequent package. The hash function DEFINIR from ADR-002 also has no ADR written yet, which by spec must precede any RNG implementation."
+    },
+    "warnings": [
+      "ADRs for DEFINIR items ADR-002 (hash function) and ADR-004 (division enforcement mechanism) have no corresponding files in docs/decisions/ yet. The spec requires an ADR be written before implementation for every DEFINIR item. Any work that begins implementing the RNG or division helpers without those ADRs violates §16 Definition of Done item 7 and §19 protocol.",
+      "tools/replay and tools/bench are both empty stubs. FASE-1 acceptance requires tools/replay comparing two executions and reporting the first divergent tick, and tools/bench with frozen calibration ratios. These have no declared dependencies in their package.json files either, suggesting they have not been planned yet.",
+      "There is no electron-builder configuration anywhere in the repository. FASE-1 acceptance requires a minimal installer for Windows and Linux produced by CI. This is explicitly called out in the spec as a sequencing risk: discovering packaging problems late is a retroactive failure mode (§14.6).",
+      "The CI workflow only runs on ubuntu-latest. FASE-1 requires the platform matrix (Windows and Linux, fixed Electron version, worker vs CLI replay comparison) per §17 Gate de CI item 6. The current CI does not cover this requirement."
+    ]
+  }
+}

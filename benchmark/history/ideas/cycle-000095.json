@@ -1,0 +1,156 @@
+{
+  "created_at": "2026-08-14T11:19:13.217516+00:00",
+  "cycle_id": "CYCLE-000095",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ that specifies the hash function (SplitMix64 over FNV-1a accumulator or equivalent) bit-by-bit",
+          "rand(masterSeed, namespace, ...coordinates) -> uint64 exported from packages/core as a pure function",
+          "All namespaces from ADR-002 table representable as call-site coordinates",
+          "Unit tests prove rand returns identical output for identical arguments across multiple calls",
+          "Test proves rand(seed, 'market.trend', assetId, octave, blockIndex) is independent of call count — INV-02 precondition",
+          "No PRNG state, no Math.random, no Date, no crypto — lint must remain green"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002",
+          "§12 INV-02",
+          "§12 INV-12",
+          "§15 FASE-1 acceptance",
+          "§19 Lacunas conhecidas — função de hash"
+        ],
+        "title": "Resolve ADR-002 hash function and implement positional RNG in packages/core",
+        "why_now": "The positional RNG (rand(masterSeed, namespace, ...coordinates)) is the root dependency of every determinism-sensitive system: price generator, macro events, bot decisions, NPC tips, and identifier derivation. ADR-002 requires the hash function to be specified bit-by-bit in an ADR before any implementation, and no such ADR exists yet. Without this, INV-02, INV-12, and the entire packages/world layer are blocked. This is the single most blocking gap remaining in packages/core."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate as branded bigint types with validating constructors that reject non-bigint and out-of-range values",
+          "Tick as branded safe-integer number type with validating constructor",
+          "QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE constants exported from packages/core",
+          "divTruncate, divRoundHalfUp, divRoundHalfEven helpers for bigint division with explicit rounding mode",
+          "Multiplication helper for Quantity * Price producing bigint intermediate without overflow",
+          "Unit tests for each type's constructor rejection cases",
+          "Unit tests for each rounding mode against known integer quotients",
+          "Lint remains green — no float literals, no untyped number for economic values"
+        ],
+        "category": "architecture",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003",
+          "§3 ADR-004",
+          "§12 INV-23",
+          "§14.1 TypeScript branded types",
+          "§15 FASE-1 acceptance"
+        ],
+        "title": "Implement branded numeric types and division helpers in packages/core",
+        "why_now": "ADR-003 and ADR-004 require Money, Quantity, Price, Rate, and Tick to be bigint-backed branded types with validating constructors, and all division to declare an explicit rounding mode. Without these types, packages/domain and packages/world cannot express any economic value correctly, and the compiler cannot enforce the invariants. These are the foundation that every downstream package depends on and must exist before any economic logic is written."
+      },
+      {
+        "acceptance_targets": [
+          "price(assetId, tick) -> Price pure function in packages/world",
+          "trendLayer using octave-block interpolation over rand() without Math.sin/cos/exp",
+          "idiosyncraticNoise using octave-block interpolation over rand()",
+          "Parameters (octave count, periods, amplitudes) stored in a versionable config object, not hardcoded",
+          "INV-02 test: price(ORB, 9_000_000) equals the value reached by advancing one tick at a time to tick 9_000_000",
+          "INV-03 test: two runs with different player action logs produce identical worldPrice series",
+          "Lint green — no transcendental math, no float literals for prices"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 price construction",
+          "§12 INV-02",
+          "§12 INV-03",
+          "§15 FASE-1 acceptance",
+          "§3 ADR-002 — namespaces market.trend, market.factor"
+        ],
+        "title": "Implement price generator in packages/world with two assets and two noise layers",
+        "why_now": "The FASE-1 scope explicitly requires a price generator with two noise layers (trendLayer, idiosyncraticNoise) and at least two assets (ORB and one other). This is the first domain deliverable visible to the tick loop and the replay CLI. It also produces the first executable test of INV-02 (positional price equals tick-by-tick traversal), the most important test in the project per the spec. Cannot proceed until IDEA-001 and IDEA-002 are done."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction/Entry/Account types in packages/domain enforcing per-commodity balance == 0",
+          "Accounts: player:cash:BRL, player:spot:<ASSET>, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, venue:fees",
+          "Market order execution (buy and sell spot) producing balanced Transactions",
+          "Canonical 10-step tick loop implemented in a single function in packages/application, steps readable as a list",
+          "Test that processes steps in declared order — funding before liquidation (steps 3-4)",
+          "INV-04 test: every Transaction sums to zero per commodity",
+          "INV-05 test: sum of all BRL account balances is zero after any sequence of operations",
+          "INV-06 test: sum of quantities per asset across all accounts is zero",
+          "INV-07 test: rounding residue account explains every cent of truncation loss"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 Ledger",
+          "§7 canonical tick order",
+          "§12 INV-04",
+          "§12 INV-05",
+          "§12 INV-06",
+          "§12 INV-07",
+          "§12 INV-13",
+          "§15 FASE-1 acceptance"
+        ],
+        "title": "Implement double-entry ledger, market orders, and canonical tick loop",
+        "why_now": "The ledger (packages/domain) and the canonical 10-step tick loop (packages/application) are required for INV-04 through INV-07 and INV-13, all of which are FASE-1 acceptance criteria. Without these, there is no save state, no replay, and no way to verify determinism end-to-end. Market orders (buy and sell spot) are the only order type in scope for FASE-1. The tick loop with its fixed canonical ordering is TRAVADO and must be implemented as a single readable list of steps with a test that verifies the order."
+      },
+      {
+        "acceptance_targets": [
+          "electron-builder configured for Windows (NSIS) and Linux (AppImage) targets",
+          "apps/desktop/main, preload, renderer compile and launch a visible window",
+          "contextIsolation: true, nodeIntegration: false, sandbox: true verified programmatically",
+          "preload exposes only an allowlisted set of IPC channels via contextBridge — no generic invoke channel",
+          "Content Security Policy set without unsafe-eval and without remote loading",
+          "CI step produces installer artifacts for both platforms",
+          "INV-29 audit step added to CI gate"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.2 Electron security — INV-29",
+          "§14.6 packaging and platforms",
+          "§15 FASE-1 acceptance — instalador mínimo",
+          "§12 INV-29"
+        ],
+        "title": "Minimum Electron installer for Windows and Linux produced by CI",
+        "why_now": "The spec explicitly mandates the installer exist in FASE-1 in minimum form, before the end, because discovering cross-platform ABI and packaging problems late is fatal. A window that opens and displays the correct Electron security flags (contextIsolation: true, nodeIntegration: false, sandbox: true) is enough. This work is independent of the engine packages and can proceed in parallel. INV-29 requires the security configuration to be verified in CI, which also unblocks that invariant from the FASE-1 acceptance checklist."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "packages/core has the CanonicalEncoder (ADR-009 implemented and documented). Monorepo structure, determinism lint rules, and dependency boundary checker are all in place with passing tests. All other packages (world, domain, application, contracts, narrative, adapters, ui) are empty stubs. No hash function ADR, no RNG, no branded types, no ledger, no tick loop, no save format, no price generator, no Electron app, no installer.",
+      "highest_priority_gap": "The positional RNG (ADR-002) and branded numeric types (ADR-003/ADR-004) in packages/core are not implemented. No ADR exists for the hash function, which is a DEFINIR item that must be resolved before any downstream domain work can be written. This blocks the entire packages/world, packages/domain, and packages/application layers."
+    },
+    "warnings": [
+      "ADR-002 requires the hash function to be specified bit-by-bit in an ADR before implementation. No such ADR exists in docs/decisions/ as of this assessment. This is an unresolved DEFINIR item that must produce an ADR (not just inline code) before rand() is committed — implementing the RNG without the ADR violates the spec's protocol for DEFINIR items (§19).",
+      "The FASE-1 acceptance criterion for INV-11 (step-1, step-100, and direct-jump produce identical StateHash) cannot be verified until IDEA-001 through IDEA-004 are complete and the save/replay CLI exists. This invariant spans multiple packages and will be the last FASE-1 gate item to close."
+    ]
+  }
+}
