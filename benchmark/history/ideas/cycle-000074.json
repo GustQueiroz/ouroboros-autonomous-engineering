@@ -1,0 +1,159 @@
+{
+  "created_at": "2026-08-14T08:05:40.262087+00:00",
+  "cycle_id": "CYCLE-000074",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Number.MAX_SAFE_INTEGER and Number.NaN captured as const module-level bindings before any export; zero reads from Number.* during traversal after module initialization",
+          "Focused regression test installs a throwing/counting accessor on Number.MAX_SAFE_INTEGER after import and verifies zero invocations across array encoding, cycle detection, and rejection paths",
+          "npm run compile and npm run boundary both executed on the exact candidate commit, exit codes and full stdout/stderr captured as independently verifiable evidence (not summarized)",
+          "INV-22: two logically equal states produce identical canonical bytes; two logically different states produce different bytes",
+          "ADR-009 document committed to docs/decisions/ with bit-level encoding specification before any StateHash work is added"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-009",
+          "§15 FASE-1 acceptance: ADR-009 written and encoder implemented before any StateHash",
+          "§14.4 core package",
+          "INV-22",
+          "§13 prohibition on mutable global reads in pure packages"
+        ],
+        "title": "Fix mutable-global and evidence gaps to land CanonicalEncoder",
+        "why_now": "All FASE-1 production logic is gated behind a committed CanonicalEncoder. After 9 cumulative review attempts across TASK-0004/0005/0006, the two remaining blockers are precisely identified and narrow: (1) Number.MAX_SAFE_INTEGER and Number.NaN are read from mutable globals during array traversal instead of being captured as module-level constants at initialization — a post-import accessor can execute user code during encoding, violating ADR-009 zero-user-code-execution requirement; (2) npm run compile and npm run boundary evidence is absent as independently captured command output and cannot be treated as independently verified. These are the only two FAIL criteria from TASK-0006-review-03. Nothing else is blocked by the encoder specification itself."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate as branded bigint types with constructors that reject NaN, Infinity, -0, and non-bigint input",
+          "Tick as branded safe integer (number) type with constructor that rejects non-integer, values outside [-(2^53-1), 2^53-1], and non-finite values",
+          "Division helper with explicit rounding mode parameter (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN); calling division without a mode is a compile error via overload or branded parameter",
+          "RATE_SCALE, QUANTITY_SCALE, PRICE_SCALE constants declared as bigint literals",
+          "INV-23 property test: safe integer type values never exceed 2^53-1 in a simulated 10-year replay (525600 ticks)",
+          "Lint and compile pass; no float literals, no unbranded number in economic position"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003 (bigint for economic values, safe integer for Tick and generator internals)",
+          "ADR-004 (division must declare rounding mode)",
+          "§4 domain glossary",
+          "§14.4 core package",
+          "INV-23 (no safe integer overflow in 10-year replay)",
+          "§13 (float literals and number type for economic values forbidden in pure packages)"
+        ],
+        "title": "Implement nominal types and integer arithmetic in packages/core",
+        "why_now": "Once CanonicalEncoder is committed, the next FASE-1 dependency chain requires the full core package: branded types for Money, Quantity, Price, Rate, and Tick with constructors that enforce the ADR-003 invariants. Without these types, the ledger, price generator, and order execution cannot be correctly typed, and the compiler cannot enforce that a Tick is never added to a Money or that a division always declares its rounding mode. Every other FASE-1 component depends on this layer."
+      },
+      {
+        "acceptance_targets": [
+          "ADR committed to docs/decisions/ specifying the exact hash function bit-by-bit (SplitMix64 over FNV-1a accumulator recommended by spec), with test vectors",
+          "rand(masterSeed, namespace, ...coordinates) -> uint64 as bigint implemented in packages/core with namespace isolation via the reserved namespace table",
+          "Property test: same arguments always produce same output",
+          "Property test: different namespaces produce values with no detectable sequential correlation across a sweep of coordinates",
+          "INV-02 satisfied: rand(seed, ns, assetId, octave, blockIndex) at tick 9_000_000 equals result of advancing one tick at a time to that tick",
+          "No PRNG state, no Math.random, no sequential dependency anywhere in the implementation"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 (rand function signature, namespace table, no sequential PRNG, hash function is DEFINIR)",
+          "§5.1 (price generator consumes rand)",
+          "§13 (Math.random and crypto.randomUUID forbidden)",
+          "§19 (DEFINIR items require ADR before implementation)",
+          "INV-02 (direct tick lookup equals tick-by-tick traversal)",
+          "INV-03 (player actions do not alter worldPrice)",
+          "INV-12 (no external entropy in domain identifiers)"
+        ],
+        "title": "Write ADR for hash function and implement positional RNG",
+        "why_now": "The positional RNG is a DEFINIR item that must be resolved by ADR before implementation (§19). It is required by the price generator, macro events, and bot policy — all FASE-1 components. The spec recommends SplitMix64 over FNV-1a as a starting point and requires the function to be specified bit-by-bit. Without the ADR written first, any implementation is unacceptable per the spec's own protocol. After nominal types are committed, this is the next unblocked FASE-1 dependency."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction, Entry, Account types with commodity declared on every Entry at compile time (missing commodity is a type error)",
+          "All mutations go through Transaction; no direct balance mutation is possible",
+          "All required account names present: world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, world:insurance_fund, player:cash:BRL, player:spot:<ASSET>, player:margin:<INSTRUMENT>, venue:fees, venue:funding, venue:realized_pnl, venue:liquidation_penalty",
+          "INV-04 test: per-commodity sum is exactly zero in every Transaction",
+          "INV-05 test: BRL sum across all accounts is zero after every Transaction",
+          "INV-06 test: per-asset quantity sum across all accounts is zero after every Transaction",
+          "INV-07 test: rounding residue in world:rounding_residue:<COMMODITY> equals the exact difference between nominal value and sum of truncated entries",
+          "Entries are immutable; correction requires a compensating Transaction",
+          "Property test: 1000 random sequences of valid Transactions preserve INV-04, INV-05, INV-06"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "low",
+        "spec_refs": [
+          "§6 (Ledger)",
+          "ADR-003 (bigint for all monetary values)",
+          "ADR-004 (rounding residue must be captured)",
+          "INV-04 (per-commodity sum zero in every Transaction)",
+          "INV-05 (BRL sum across all accounts zero in every tick)",
+          "INV-06 (per-asset quantity sum zero in every tick)",
+          "INV-07 (rounding residue accounts for all truncated value)",
+          "§13 (JSON.stringify over economic value forbidden)"
+        ],
+        "title": "Implement multi-commodity double-entry ledger",
+        "why_now": "The ledger is the core of the economic engine and is required for every FASE-1 acceptance criterion involving money or asset movement (INV-04 through INV-07). It must be implemented before market orders, tick processing, or save/replay can be meaningfully tested. It depends only on core types and has no dependency on the price generator or RNG, so it can proceed in parallel with or immediately after IDEA-003."
+      },
+      {
+        "acceptance_targets": [
+          "ADR committed to docs/decisions/ declaring octave count, block periods, and amplitude schedule for trendLayer and idiosyncraticNoise, stored in a versionable config file",
+          "price(assetId, tick) -> Price implemented in packages/world using only positional rand, integer arithmetic, and fixed-point linear interpolation (no Math.sin/cos/exp/log/pow)",
+          "Two assets (ORB blue-chip and one higher-volatility asset) with distinct logPrice0 and volBase parameters derived from archetype",
+          "trendLayer and idiosyncraticNoise layers implemented as fractal octave sums with block sampling and linear interpolation",
+          "INV-02 test: price(ORB, 9_000_000) == price computed by advancing one tick at a time to 9_000_000",
+          "INV-03 test: two sessions with different player action logs but same seed produce identical worldPrice series for every sampled tick",
+          "Performance test: p95 of price(asset, tick) across 20 warm runs is within 2µs on reference hardware using tools/bench calibration ratio"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 (logPrice formula, trendLayer, idiosyncraticNoise, fractal octaves, fixed-point interpolation)",
+          "ADR-002 (price generator uses positional rand)",
+          "ADR-003 (no floating point, no Math.sin/cos/exp/log/pow)",
+          "ADR-005 (tick base price is a single point value, no OHLC)",
+          "§19 (octave count, periods, amplitudes are DEFINIR — require ADR first)",
+          "INV-02 (price(asset, t) direct equals tick-by-tick traversal)",
+          "INV-03 (player actions do not alter worldPrice series)",
+          "§18 (price(asset, tick) must complete within 2µs)"
+        ],
+        "title": "Write octave parameter ADR and implement price generator (2 assets, 2 layers)",
+        "why_now": "FASE-1 acceptance explicitly requires a price generator with at least two noise layers and two assets. The octave count, periods, and amplitudes are a DEFINIR item that must be resolved by ADR before implementation. With core types, RNG, and the ledger committed, this is the last major foundational component needed to close FASE-1 and satisfy INV-02 and INV-03 with real data. Deferring it further pushes all downstream phases."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Infrastructure complete: CI pipeline (4 blocking gates), strict TypeScript config, ESLint determinism rules enforcing §13 prohibitions, dependency boundary checker enforcing §14.5 graph, and their tests. All 8 packages, 4 desktop sub-apps, and 3 tool packages are empty stubs (export {} only). Zero production logic committed. No ADRs written. The project has spent 26 cycles blocked on a single task: ADR-009 CanonicalEncoder in packages/core. All 9 review iterations across TASK-0004/0005/0006 have been rejected, with the same two FAIL criteria in the final review: (1) Number.MAX_SAFE_INTEGER read from mutable global during traversal instead of captured at module initialization, and (2) npm run compile and npm run boundary evidence absent as independently captured command output.",
+      "highest_priority_gap": "The CanonicalEncoder (ADR-009) has not been committed after 9 review attempts. Until it is committed, no StateHash can exist, which blocks INV-01 and INV-22, and by extension all downstream FASE-1 acceptance criteria. The specific remaining fixes are narrow and precisely identified in TASK-0006-review-03: capture Number.MAX_SAFE_INTEGER and Number.NaN as module-level constants before any traversal code, add a monkeypatch regression test proving zero accessor invocations, and capture compile and boundary command output independently."
+    },
+    "warnings": [
+      "The benchmark has consumed approximately 26 cycles with zero committed production logic beyond infrastructure scaffolding. FASE-1 has at least eight additional major deliverables (core types, RNG, ledger, price generator, orders, tick loop, save/replay CLI, Electron installer with minimum UI). At the current rate of one blocked task consuming all cycles, FASE-1 completion within the 30-day window is at serious risk. Once the encoder is unblocked, subsequent tasks should be scoped to deliver one coherent FASE-1 component at a time rather than attempting large multi-component implementations.",
+      "TASK-0004 through TASK-0006 failed REVIEW-001 (mutable global read) and REVIEW-002 (missing compile/boundary evidence) across all 9 attempts. The next implementation of the CanonicalEncoder must explicitly demonstrate: (a) every reference to Number.MAX_SAFE_INTEGER and Number.NaN replaced with a module-level const captured before any export, and (b) npm run compile and npm run boundary run on the exact committed state with full stdout/stderr and exit codes included as independent evidence — not summarized by the implementer.",
+      "Zero ADRs exist in docs/decisions/ despite multiple DEFINIR items that the spec requires to be resolved by ADR before their dependent implementations can begin: the hash function (ADR-002), the encoding specification (ADR-009), octave parameters for the price generator (§5.1), the technical enforcement of division rounding modes (ADR-004), IMPACT_WINDOW (ADR-007), and BOT_DECISION_PERIOD (§5.3). Each DEFINIR item must have its ADR written before the implementation it governs is started. The ADR backlog will compound as more FASE-1 components come online."
+    ]
+  }
+}

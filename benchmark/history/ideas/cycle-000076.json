@@ -1,0 +1,142 @@
+{
+  "created_at": "2026-08-14T08:14:42.100410+00:00",
+  "cycle_id": "CYCLE-000076",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR-009 committed to docs/decisions/ with full specification: key ordering (UTF-8 byte comparison, recursive), bigint as decimal ASCII with explicit sign, nominal integer with type marker distinct from bigint, prohibition of undefined/NaN/Infinity/-0, ordered vs unordered collections, encodingVersion participation",
+          "CanonicalEncoder exported from @ciclo/core with encode(state) -> Uint8Array",
+          "Property tests: two logically equal states produce identical bytes; two logically different states produce different bytes",
+          "Type-level prohibition: undefined/NaN/Infinity/-0 are rejected at encode time, not silently normalized",
+          "encodingVersion is a parameter to the encoder, not a global constant"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-009 (§3)",
+          "§15 FASE-1 acceptance criteria",
+          "INV-22",
+          "§16 Definition of Done item 6"
+        ],
+        "title": "Write ADR-009 and implement CanonicalEncoder in packages/core",
+        "why_now": "FASE-1 acceptance criteria explicitly require ADR-009 written and the encoder implemented before any state hash exists. Currently zero ADRs and zero product code exist. StateHash and SaveHash — both mandatory for FASE-1 — cannot be computed without this encoder. Every subsequent test that compares state hashes depends on this piece being correct and stable first."
+      },
+      {
+        "acceptance_targets": [
+          "ADR committed to docs/decisions/ specifying the hash function bit-by-bit (recommended: SplitMix64 over FNV-1a accumulator)",
+          "rand(masterSeed, namespace, ...coordinates) -> uint64 exported from @ciclo/core as a pure function with no state",
+          "All 11 namespaces from ADR-002 table are defined as typed constants",
+          "Test: rand(seed, ns, a, b) === rand(seed, ns, a, b) across 10000 random inputs",
+          "Test: rand result with large coordinate values matches rand result from tick-by-tick traversal (verifying positional, not sequential, behavior)",
+          "No Math.random, no stateful PRNG, lint passes"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 (§3)",
+          "§15 FASE-1 acceptance criteria",
+          "INV-02",
+          "INV-12",
+          "§19 DEFINIR: hash function"
+        ],
+        "title": "Write hash function ADR and implement positional RNG in packages/core",
+        "why_now": "ADR-002 requires the hash function to be specified bit-by-bit in an ADR before any implementation. The positional RNG is the foundation of all determinism in the price generator, macro events, bots, and NPC tips. No namespace from the ADR-002 table (market.trend, market.factor, macro.schedule, bot.policy, etc.) can be sampled without this. This is independent of the CanonicalEncoder and can proceed in parallel or immediately after."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate as branded bigint types exported from @ciclo/core with QUANTITY_SCALE=100_000_000, PRICE_SCALE=10_000, RATE_SCALE=100_000_000",
+          "Tick as branded safe-integer type with constructor that rejects non-integer and out-of-[-(2^53-1), 2^53-1] values",
+          "Division helper with explicit RoundingMode enum (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) — calling division without mode is a compile error",
+          "Notional conversion (quantityRaw * priceRaw) / (QUANTITY_SCALE * PRICE_SCALE) computed in bigint with truncation only at ledger write boundary",
+          "Property test: no tick or noise counter exceeds 2^53 in a 10-year replay (INV-23)",
+          "TypeScript compilation enforces brand — raw number is not assignable to Money"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003 (§3)",
+          "ADR-004 (§3)",
+          "§4 type table",
+          "§15 FASE-1 acceptance criteria",
+          "INV-23"
+        ],
+        "title": "Implement nominal types and integer arithmetic in packages/core",
+        "why_now": "ADR-003 requires branded bigint types for Money, Quantity, Price, Rate and branded safe-integer type for Tick. Without these types and their constructors, no ledger, order, position, or price calculation can be written in a spec-compliant way. They are the prerequisite for IDEA-005 (ledger) and for the price generator's output type. These types are also what makes the lint rules in tools/lint/pure-rules.mjs meaningful — the rules ban float literals but there is nothing yet to enforce correct use."
+      },
+      {
+        "acceptance_targets": [
+          "electron and electron-builder added to apps/desktop/main",
+          "Main process creates a BrowserWindow with contextIsolation: true, nodeIntegration: false, sandbox: true",
+          "Preload exposes only a typed allowlist via contextBridge — no generic invoke channel",
+          "Renderer displays the §20 mandatory disclaimer in Portuguese",
+          "CI produces a Windows .exe installer and a Linux .AppImage or .deb artifact",
+          "INV-29 automated check passes: config is read and verified in CI test",
+          "Content Security Policy set — no unsafe-eval, no remote load"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.6 packaging",
+          "§15 FASE-1 acceptance criteria",
+          "§14.2 Electron security (INV-29)",
+          "§20 mandatory disclaimer"
+        ],
+        "title": "Add minimal Electron application and CI installer for Windows and Linux",
+        "why_now": "FASE-1 explicitly requires a minimal installer for Windows and Linux produced by CI, even if the application does little. The spec warns this must not be deferred: packaging problems discovered late (ABI mismatch, native module recompilation, path issues) are not locally correctable. Currently Electron is not a dependency anywhere in the monorepo and no bundler config exists. A window that opens and shows the simulation disclaimer satisfies this criterion."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction, Entry, Account types implemented with commodity declared on each Entry",
+          "Per-commodity balance enforcement: forEach commodity, sum(entries for that commodity) === 0n",
+          "All minimum accounts defined (world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, player:cash:BRL, player:spot:<ASSET>, venue:fees)",
+          "Rounding residue from every division is routed to world:rounding_residue:<COMMODITY>, never discarded",
+          "Market order (buy and sell spot) produces correct four-entry transaction (BRL out, ORB in, counterparty cash, asset supply)",
+          "Unit tests green for INV-04, INV-05, INV-06, INV-07 against a fixed set of transactions",
+          "No transaction orphan: every Transaction carries tick, sequence, kind, causationId"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "low",
+        "spec_refs": [
+          "§6 Ledger",
+          "§7 tick canonical order steps 4-6",
+          "§15 FASE-1 acceptance criteria",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07"
+        ],
+        "title": "Implement multi-commodity double-entry ledger in packages/domain",
+        "why_now": "FASE-1 requires a multi-commodity double-entry ledger and market orders (buy and sell spot). INV-04 through INV-07 must be green for FASE-1 acceptance. The ledger is the economic core: every order execution, fee, funding payment, and rounding residue flows through it. Without it, no tick loop can be tested end-to-end. This proposal is unblocked once nominal types from IDEA-003 exist."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold is complete with strict TypeScript config, ESLint purity rules, dependency boundary enforcer, and CI pipeline — all passing. All 8 domain packages, 4 Electron process packages, and 3 tool packages contain only `export {}`. No ADRs have been written. No product code exists. Electron is not installed. No test files for product code exist.",
+      "highest_priority_gap": "CanonicalEncoder (ADR-009) is explicitly required by FASE-1 acceptance criteria before any state hash can exist, yet it has not been implemented after 27 benchmark cycles. Without it, StateHash and SaveHash cannot be computed, and all invariants that depend on hash comparison (INV-01, INV-22) cannot be verified."
+    },
+    "warnings": [
+      "The benchmark has run for 27 cycles (~9 hours) with zero product code accepted. Previous attempts at the CanonicalEncoder were rejected. The Implementer must write the ADR-009 document first and have it fully specify the encoding before writing any code — the spec's Definition of Done (§16 item 1) requires acceptance criteria written before code.",
+      "No DEFINIR items have been resolved via ADR. FASE-1 acceptance criteria require at minimum ADR-009 (CanonicalEncoder) and the hash function ADR (ADR-002 DEFINIR) to be written. Without these ADRs, the implemented behavior has no normative specification and cannot be reviewed for correctness.",
+      "The rounding mode enforcement (ADR-004) requires a technical mechanism — a compile-time or lint-time error when division is called without a mode. This DEFINIR must be resolved by ADR before any division operation is written in the domain or core packages."
+    ]
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "created_at": "2026-08-14T08:09:19.015749+00:00",
+  "cycle_id": "CYCLE-000075",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Number.MAX_SAFE_INTEGER and Number.NaN are captured as module-level const bindings at module initialization in canonical.ts; capturedParseInt10 and all array-traversal or cycle-detection paths read only those captured constants and never access Number.MAX_SAFE_INTEGER or Number.NaN through a live property lookup at call time.",
+          "A focused post-import monkeypatch test installs a counting/throwing accessor on Number.MAX_SAFE_INTEGER after module import, runs canonical array encoding and cycle-detection paths on array inputs, and asserts zero accessor invocations and byte-identical output or identical error codes.",
+          "Captured terminal output of npm run compile (exit 0) and npm run boundary (exit 0) on the exact corrected candidate state is included as independent validation evidence, alongside lint and the complete test suite.",
+          "All pre-existing tests continue to pass. ADR-009 is present and complete in docs/decisions/. No StateHash implementation is introduced."
+        ],
+        "category": "bug",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-009 — CanonicalEncoder traversal uses only module-private captured intrinsics",
+          "§12 INV-22 — logically equal states produce byte-identical canonical output",
+          "§15 FASE-1 — ADR-009 written and encoder implemented before any StateHash exists",
+          "§17 Gate de CI item 5 — replay of three reference games with StateHash comparison per tick"
+        ],
+        "title": "Fix CanonicalEncoder: capture Number constants and produce full validation evidence",
+        "why_now": "TASK-0006 was rejected in its third and final review for exactly two MAJOR findings: (1) capturedParseInt10 in canonical.ts reads Number.MAX_SAFE_INTEGER and Number.NaN from the live global at call time rather than capturing them as module-level constants at initialization, violating the zero-user-code-execution guarantee required by ADR-009 and the task acceptance criteria; (2) the validation evidence supplied no captured output of npm run compile or npm run boundary on the corrected candidate. packages/core/src/index.ts currently exports nothing, meaning no accepted implementation exists. StateHash cannot exist until the encoder is accepted, and every FASE-1 hash-dependent deliverable — INV-01, INV-22, the CI replay gate comparing StateHash tick by tick, tools/replay — is blocked on this acceptance. The two remaining issues are mechanical and narrowly scoped."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, and Rate defined as bigint branded types in packages/core with constructors that reject non-bigint input and values that are not integers.",
+          "Tick defined as a number branded type with a constructor rejecting non-integer and values outside [-(2^53-1), 2^53-1].",
+          "QUANTITY_SCALE = 100_000_000n, PRICE_SCALE = 10_000n, RATE_SCALE = 100_000_000n defined as bigint constants and exported.",
+          "A division helper exported from packages/core accepting explicit modes TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, and ROUND_HALF_EVEN, returning both quotient and residue; calling division without a mode is a compile-time or lint-level error enforced by the mechanism documented in ADR-004.",
+          "ADR-004 is written in docs/decisions/ specifying the chosen enforcement mechanism before implementation depends on it.",
+          "Unit tests cover constructor rejection paths and each division mode including residue correctness. Lint, compile, and boundary gates remain green."
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003 — Money, Quantity, Price, Rate as bigint; Tick as safe-integer number; QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE",
+          "§3 ADR-004 — every division declares rounding mode; residue to world:rounding_residue; DEFINIR technical enforcement",
+          "§12 INV-23 — no safe-integer value exceeds 2^53 in any replay",
+          "§13 — lint prohibitions on float literals and number for economic values",
+          "§19 — DEFINIR items require ADR before implementation"
+        ],
+        "title": "Branded numeric types and division helper in packages/core (ADR-003 + ADR-004)",
+        "why_now": "Every downstream FASE-1 component — ledger entries, price queries, order execution, tick-loop arithmetic, and RNG coordinates — must use the typed vocabulary defined by ADR-003 and ADR-004. Without Money, Quantity, Price, and Rate as bigint nominal wrappers and Tick as a safe-integer number nominal wrapper, implementing any of those subsystems forces a cross-cutting retrofit later. ADR-004 further requires that every division declares a rounding mode and that calling division without a mode is a compile error or lint error; establishing the enforcement mechanism now prevents undetected precision loss from accumulating across future domain code. This work is independent of the CanonicalEncoder and can proceed in parallel while IDEA-001 is in review."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ specifying the hash function step-by-step: input encoding, accumulator algorithm, output width, and namespace isolation mechanism, with no implementation ambiguity.",
+          "rand() implemented as a pure function in packages/core with no module-level mutable state; the same (masterSeed, namespace, ...coordinates) triple always produces the same uint64 output regardless of call order or call count.",
+          "Test verifying that rand() output for identical arguments is call-order-independent: results from varied interleaving sequences are byte-identical.",
+          "No Math.random, Date, or any external entropy source used. Lint, compile, and boundary gates remain green."
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002 — rand(masterSeed, namespace, ...coordinates), no mutable PRNG state, DEFINIR hash primitive, bit-by-bit specification required in ADR",
+          "§12 INV-02 — price(asset, t) queried directly equals arriving at t tick by tick",
+          "§12 INV-12 — no domain identifier depends on external entropy",
+          "§14.4 — packages/core scope includes hash and rng positional",
+          "§13 — lint prohibitions on Math.random, crypto.randomUUID, any entropy source"
+        ],
+        "title": "Positional RNG with ADR specifying hash primitive bit-by-bit (ADR-002)",
+        "why_now": "The price generator, macro event scheduler, bot policy derivation, NPC tip truth values, and venue liquidity all consume rand(masterSeed, namespace, ...coordinates). None of them can be implemented with correct INV-02 determinism until the hash primitive is specified bit-by-bit in an ADR and the pure rand() function is present in packages/core. ADR-002 marks the hash function as DEFINIR and recommends SplitMix64 over an FNV-1a accumulator; the ADR must be written before the implementation can exist. Without it no correctness test for the price generator is meaningful, because there is no specification of what the correct output should be."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main opens a BrowserWindow with contextIsolation: true, nodeIntegration: false, sandbox: true, and a restrictive Content Security Policy (no unsafe-eval, no remote loads) in both development and production modes.",
+          "apps/desktop/preload exposes only a named allowlist of IPC channels via contextBridge; no generic invoke(channel, args) pattern is present.",
+          "apps/desktop/simulation-worker is launched as a worker thread from main; packages/contracts defines a typed message contract for all messages between renderer, main, and worker.",
+          "CI produces a working installable artifact (NSIS on Windows, AppImage or deb on Linux) via electron-builder; the artifact opens a window on both platforms.",
+          "INV-29 automated audit confirms the three required flags are set in all execution modes.",
+          "Electron version is pinned in a versioned configuration file."
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002 — Electron version fixed in a versioned file, changes only by ADR",
+          "§14.1 — Electron desktop with electron-builder installer",
+          "§14.2 — contextIsolation: true, nodeIntegration: false, sandbox: true; preload exposes allowlist-only channels via contextBridge; simulation runs in dedicated worker",
+          "§14.6 — installers for Windows and Linux from CI, FASE-1 in minimal form",
+          "§12 INV-29 — contextIsolation active, nodeIntegration off, sandbox active in all modes; preload exposes only allowlist channels",
+          "§15 FASE-1 — installer mínimo for Windows and Linux produced by CI; simulation already in worker with typed contract"
+        ],
+        "title": "Electron scaffolding with INV-29 security config and minimal installer (FASE-1 acceptance)",
+        "why_now": "The FASE-1 acceptance criteria explicitly require a minimal installer for Windows and Linux produced by the CI, and a simulation already running in a dedicated worker outside the render thread with a typed message contract. INV-29 requires contextIsolation: true, nodeIntegration: false, and sandbox: true in all execution modes including development. The spec warns that if packaging appears late, native module ABI problems and cross-platform path issues emerge in the final week when there is no time to fix architecture. apps/desktop/main, preload, renderer, and simulation-worker exist as directories with stub index.ts files only. This work is independent of the CanonicalEncoder and of the numeric type and RNG work, and can proceed without blocking on either."
+      },
+      {
+        "acceptance_targets": [
+          "ADR or versioned configuration file records octave count, period lengths, and amplitude schedule for the FASE-1 two-asset subset before any implementation depends on those numbers.",
+          "price(assetId, tick) implemented as a pure function in packages/world accepting two ORB and NEXA asset IDs, two noise octaves per asset, returning Price (bigint int64).",
+          "INV-02 test: price(asset, t) queried directly equals the price produced by simulating from tick 0 to t one tick at a time, for at least 1000 randomly sampled (asset, tick) pairs.",
+          "INV-03 test: two calls with the same (seed, asset, tick) but different player action logs produce identical worldPrice values.",
+          "No Math.random, Math.sin, Math.exp, Math.log, Math.pow, Math.sqrt, floating-point literals, or Date used. Lint, compile, and boundary gates remain green."
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 — logPrice construction: logPrice0 + trendLayer + idiosyncraticNoise; octaves with fixed periods sampling rand() at block vertices and interpolating; number of octaves is DEFINIR",
+          "§12 INV-02 — price(asset, t) directly equals arriving at t tick by tick",
+          "§12 INV-03 — player actions do not alter worldPrice",
+          "§15 FASE-1 — price generator with two noise layers and two assets",
+          "§3 ADR-003 — Price as bigint int64 with PRICE_SCALE = 10_000; no floating-point in domain",
+          "§19 — octave count, periods, and amplitudes are DEFINIR and must be recorded in a configuration file before implementation"
+        ],
+        "title": "Minimal price generator: two assets, two noise octaves (FASE-1 core)",
+        "why_now": "FASE-1 acceptance requires a working price generator covering at least two assets with two layers of noise, feeding the tick loop. The price generator is the primary consumer of the positional RNG and is needed before the ledger and order execution can be tested against realistic price inputs. Implementing it after the RNG (IDEA-003) delivers a complete and testable chain from rand() through price(asset, tick) and enables verification of INV-02 — the most important test in the project per the spec. Without price data no meaningful tick-loop or order-execution test can run. This proposal targets only the minimal two-asset, two-octave scope required by FASE-1; the full seven-asset, multi-layer generator belongs to FASE-2."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold is complete with all package directories, TypeScript config, ESLint determinism rules, boundary lint, and infrastructure tests. All package src/index.ts files are stubs (export {}). No ADRs have been written. No production code exists in packages/core, world, domain, application, narrative, contracts, or adapters. The CanonicalEncoder required by ADR-009 has been attempted six times across TASK-0005 and TASK-0006 (three rejections each) but the accepted implementation was never committed; packages/core/src/index.ts remains empty. docs/decisions/ contains only a README.",
+      "highest_priority_gap": "CanonicalEncoder (ADR-009) is not present in the repository despite six review attempts. StateHash, INV-01, INV-22, and the FASE-1 CI replay gate all require an accepted encoder. The two remaining MAJOR findings from TASK-0006-review-03 are narrow and mechanical: capturedParseInt10 reads Number.MAX_SAFE_INTEGER and Number.NaN from mutable globals at call time rather than capturing them at module initialization, and the validation evidence contained no captured output of npm run compile or npm run boundary."
+    },
+    "warnings": [
+      "TASK-0006 has been rejected three times in sequence with overlapping MAJOR findings across TASK-0005 and TASK-0006. If the Implementer continues to supply summarized rather than captured validation evidence, the encoder will remain unaccepted regardless of code correctness. The planning agent should confirm that captured terminal output (exit code + full stdout/stderr) of npm run compile and npm run boundary is an explicit deliverable, not an optional detail.",
+      "docs/decisions/ contains no ADRs. ADR-009 (canonical encoding), ADR-002 (hash function bit-by-bit), ADR-003 (branded types), and ADR-004 (division modes and enforcement mechanism) are all DEFINIR or TRAVADO items that require ADRs before the implementation depending on them can be accepted. Every task that introduces implementation of these items must produce the corresponding ADR as a co-deliverable, or it will fail acceptance on that criterion."
+    ]
+  }
+}

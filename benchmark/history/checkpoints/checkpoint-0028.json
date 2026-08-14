@@ -1,0 +1,17 @@
+{
+  "accepted_tasks": [],
+  "checkpoint_id": "CHECKPOINT-0028",
+  "checkpoint_number": 28,
+  "commit_sha": null,
+  "created_at": "2026-08-14T08:25:19.236434+00:00",
+  "metadata": {
+    "checkpoint_interval_seconds": 1200,
+    "commit_sha_note": "The enclosing Git commit is the canonical public checkpoint SHA.",
+    "heartbeat": true,
+    "internal_commit_count": 0,
+    "public_head_before": "3e39b1850269e68911132bd863b0da77df9f5278",
+    "staging_head_before": "3e39b1850269e68911132bd863b0da77df9f5278"
+  },
+  "rejected_reviews": 0,
+  "status": "NO_ACCEPTED_CHANGES"
+}

@@ -1,0 +1,155 @@
+{
+  "created_at": "2026-08-14T08:19:44.969006+00:00",
+  "cycle_id": "CYCLE-000077",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "docs/decisions/ contains ADR for hash function choice (resolving DEFINIR from ADR-002), specifying the algorithm bit-by-bit as required",
+          "docs/decisions/ contains ADR-009 specifying CanonicalEncoder: key ordering by UTF-8 byte comparison, bigint as signed decimal ASCII, safe-integer marker distinct from bigint, prohibition of undefined/NaN/Infinity/-0, ordered vs unordered collection encoding, encodingVersion participation",
+          "packages/core/src exports CanonicalEncoder with the behaviour specified in ADR-009",
+          "Unit tests confirm: two logically equal states produce identical bytes; two logically different states produce different bytes; bigint 1n and number 1 produce distinct encodings; undefined/NaN/Infinity/-0 throw rather than silently normalize"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-009",
+          "ADR-002 (hash function — DEFINIR)",
+          "Section 14.4 packages/core",
+          "INV-22",
+          "Section 15 FASE-1 acceptance"
+        ],
+        "title": "ADR-009 document and CanonicalEncoder implementation in core",
+        "why_now": "FASE-1 acceptance criteria explicitly state 'ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir'. StateHash and SaveHash cannot be defined, tested, or validated until the canonical encoding specification exists and is implemented. This blocks INV-22 and all replay invariants. No ADRs have been written yet; two DEFINIR items (hash function from ADR-002, and the CanonicalEncoder spec from ADR-009 itself) must be resolved before any hash-producing code is authored. Doing this first prevents the most dangerous form of retroactive damage: changing the encoder after state hashes already exist."
+      },
+      {
+        "acceptance_targets": [
+          "packages/core exports Money, Quantity, Price, Rate as bigint nominal types with PRICE_SCALE=10000, QUANTITY_SCALE=100000000, RATE_SCALE=100000000",
+          "packages/core exports Tick as safe-number nominal type with validating constructor rejecting non-integer and out-of-range values",
+          "packages/core exports rand(masterSeed, namespace, ...coordinates) returning uint64 as a pure positional function with no mutable state",
+          "packages/core exports divide(a, b, mode) where mode is TRUNCATE_TOWARD_ZERO | ROUND_HALF_UP | ROUND_HALF_EVEN; calling without mode is a TypeScript compile error",
+          "INV-23 property test: no safe-integer field exceeds 2^53 across a simulated 10-year tick range",
+          "INV-12 verified: no identifier in the module depends on external entropy"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 (rand function signature, namespace table)",
+          "ADR-003 (branded types, bigint vs safe number, scales)",
+          "ADR-004 (explicit rounding modes for division)",
+          "Section 13 lint prohibitions",
+          "INV-12",
+          "INV-23",
+          "Section 14.4 packages/core"
+        ],
+        "title": "Core branded numeric types, division helpers, and positional RNG",
+        "why_now": "All domain computation in world, domain, and application depends on Money, Quantity, Price, Rate (bigint-branded), Tick (safe-number-branded), and the positional RNG. Without these, neither the price generator nor the ledger can be written in a type-safe, determinism-enforcing way. This is the second dependency after IDEA-001, since the RNG uses the hash function resolved in that ADR."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/ contains ADR resolving octave count, periods, amplitudes, and fixed-point implementation of the interpolation (no Math.sin, Math.exp, or Math.pow)",
+          "packages/world exports price(masterSeed, assetId, tick) -> Price as a pure function with no mutable state",
+          "INV-02 test: price(seed, ORB, 9000000) equals the value reached by advancing tick-by-tick from 0",
+          "INV-03 test: two calls with different action logs but the same seed produce identical worldPrice series",
+          "All arithmetic in the price path uses bigint or safe-number; no floating-point literal or Math transcendental appears in the package source"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "Section 5.1 (price construction formula)",
+          "ADR-002 (namespace table: market.trend, market.factor, market.regime)",
+          "ADR-003 (no floating point in domain)",
+          "Section 4 (ORB blue chip, NEXA layer-1)",
+          "INV-02",
+          "INV-03",
+          "INV-26 (world does not import domain)",
+          "Section 15 FASE-1 acceptance"
+        ],
+        "title": "Market price generator for two assets in packages/world",
+        "why_now": "The tick loop in application cannot be constructed until world can produce worldPrice(assetId, tick). The price generator — trendLayer, idiosyncraticNoise with octave-based block interpolation, regimeAmplitude, and logPrice composition — is the defining component of the world package and enables INV-02 and INV-03, both required for FASE-1. Two assets (ORB and NEXA) satisfy the FASE-1 minimum; all seven are FASE-2 scope. An ADR for octave count and generator parameters (DEFINIR from section 5.1) must be written alongside the implementation to prevent undocumented magic numbers from entering a versionable configuration file."
+      },
+      {
+        "acceptance_targets": [
+          "packages/domain exports Transaction, Entry, Account types; Entry requires explicit commodity; Transaction without zero per-commodity balance is a type or runtime error",
+          "All minimum accounts from section 6 are defined: world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, world:insurance_fund, player:cash:BRL, player:spot:<ASSET>, venue:fees",
+          "Market order (buy and sell) posts four ledger entries across two commodities per execution, all balancing to zero per commodity",
+          "INV-04 property test: arbitrary sequences of transactions never produce a non-zero per-commodity sum",
+          "INV-05 test: sum of all BRL account balances is zero after any sequence of spot trades",
+          "INV-06 test: sum of all quantities in asset accounts is zero",
+          "INV-07 test: rounding residue account accumulates the exact difference between nominal and truncated values, never dropping value"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "Section 6 (ledger, Transaction, Entry, multi-commodity balance)",
+          "Section 7 (order types FASE-1: market only; canonical tick order steps 5 and 6)",
+          "ADR-003 (Money, Quantity, Price as bigint)",
+          "ADR-004 (rounding residue account)",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-26 (domain does not import world)",
+          "Section 14.4 packages/domain"
+        ],
+        "title": "Multi-commodity double-entry ledger and market order execution in packages/domain",
+        "why_now": "The tick loop requires domain to evaluate liquidations, execute orders, and compute equity. The ledger is the accounting backbone of every economic operation. INV-04 through INV-07 are FASE-1 acceptance criteria and can only be tested once the ledger and market order path exist. The rounding residue account (world:rounding_residue:<COMMODITY>) is particularly critical: money that disappears in rounding is a bug by spec, and the mechanism that prevents it must be built into the first transaction that ever commits."
+      },
+      {
+        "acceptance_targets": [
+          "packages/application exports processTick(state, worldSnapshot, tick) implementing all 10 steps in the TRAVADO order with the order verifiable by a sequence test",
+          "Save serialisation/deserialisation round-trips losslessly; finalTick >= max(action.tick) is enforced on load; duplicate (tick, sequence) pairs reject the save",
+          "tools/replay compares two save files tick-by-tick and prints the first tick where StateHash diverges, or 'identical' if none",
+          "tools/bench produces a frozen baseline ratio file with the calibration protocol: 3 warm-up runs, 20 measured runs, p95 reported",
+          "INV-01 test: replay of a reference save matches the live-session StateHash at every tick",
+          "INV-11 test: advancing in steps of 1, 100, and direct-jump produces the same StateHash at the destination tick",
+          "INV-21 test: save with action.tick > finalTick is rejected at load time"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003",
+          "IDEA-004"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "high",
+        "spec_refs": [
+          "Section 7 (canonical tick order, 10 steps, TRAVADO)",
+          "ADR-006 (save format: masterSeed, finalTick, actions, checkpoint)",
+          "Section 15 FASE-1 acceptance (tools/replay, tools/bench, INV-01, INV-11, INV-21)",
+          "INV-01",
+          "INV-11",
+          "INV-21",
+          "INV-26 (application composes world and domain; neither knows the other)"
+        ],
+        "title": "Canonical tick loop and save format in packages/application plus tools/replay",
+        "why_now": "The 10-step tick processing order is TRAVADO and must be implemented at a single, readable point in the code. Without it, INV-01 (replay == live session), INV-11 (1-tick == 100-tick == direct-jump), and INV-21 (save envelope integrity) cannot be tested — all required for FASE-1 acceptance. The replay CLI (tools/replay) is also a FASE-1 deliverable: it must be able to compare two executions and report the first divergent tick. tools/bench needs a frozen baseline ratio. Deferring the tick loop risks discovering ordering bugs only after the ledger and world generator have accumulated significant dependents."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Infrastructure is complete: monorepo, TypeScript strict config, ESLint determinism lint rules, boundary dependency checker, CI pipeline, and test harness for tooling are all in place. All twelve product packages (packages/*, apps/desktop/*, tools/replay, tools/bench) contain only empty stubs (export {};). No ADRs have been written. No product implementation code exists.",
+      "highest_priority_gap": "The core package has no implementation whatsoever — no branded numeric types, no positional RNG, no CanonicalEncoder — and FASE-1 acceptance explicitly requires ADR-009 written and the encoder implemented before any state hash exists. Every other FASE-1 deliverable (world price generator, domain ledger, tick loop, replay CLI, INV-01 through INV-07, INV-22, INV-23) depends on core."
+    },
+    "warnings": []
+  }
+}
