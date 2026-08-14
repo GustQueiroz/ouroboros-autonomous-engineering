@@ -1,0 +1,90 @@
+{
+  "created_at": "2026-08-14T05:44:22.886972+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "Self-referential and mutually cyclic supported arrays, plain objects, and Sets throw CanonicalEncoderError with the ADR-009 E_CYCLE contract.",
+        "evidence": "canonical.ts checks the active traversal stack before container descent and throws E_CYCLE with message \"cyclic container is not admitted\"; focused tests cover direct and cross-container cycles, and npm test reports 167/167 passing.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repeated references outside the active traversal path encode identically to duplicated-by-value structures.",
+        "evidence": "Containers are removed from activeStack in finally blocks, and hostile-cycle.test.mjs compares shared object, Array, and Set references against duplicated-by-value equivalents.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Enumerable own accessors on top-level, nested, and null-prototype plain objects throw E_ACCESSOR_DESCRIPTOR without invocation.",
+        "evidence": "encodePlainObject inspects captured property descriptors before reading descriptor.value; hostile-object.test.mjs covers the required locations and asserts zero getter/setter calls.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Cycle detection, descriptor inspection, and traversal rely only on captured intrinsics and execute no user getter, setter, iterator override, or coercion hook.",
+        "evidence": "arrPush performs arr[arr.length] = value on ordinary internal arrays. If Array.prototype has an indexed accessor such as a setter for \"0\", pushing into a new empty internal array invokes that user setter. This affects ByteSink.parts, UTF-8 byte collection, activeStack, entries, and elementBytes and violates the no-user-setter guarantee.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "All pre-existing tests and all new focused tests pass.",
+        "evidence": "Automated validation reports 167 tests passed with zero failures or skips. SPEC_BLOCKERS.md records BLOCKER-0001 for the irreconcilable task wording that calls 157 tests pre-existing when the accepted baseline contains 44.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The exact candidate state passes lint, strict compile/typecheck, and dependency-boundary commands.",
+        "evidence": "Automated validation independently shows lint and tests passing, but contains no npm run compile or npm run boundary execution. The Implementer report asserts those results without supplying command output tied to the validated candidate state.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "No StateHash or SaveHash implementation is added.",
+        "evidence": "The candidate adds only CanonicalEncoder exports and implementation; no StateHash or SaveHash implementation appears in the supplied diff.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "packages/core/src/canonical.ts defines arrPush as arr[arr.length] = value. Ordinary assignment to a missing index performs inherited property lookup; an accessor installed on Array.prototype at that index can execute its setter. The new monkeypatch tests cover push/pop/sort/iterator but not indexed prototype accessors.",
+        "id": "REVIEW-001",
+        "required_change": "Replace internal ordinary-array growth/bookkeeping with an approach that cannot consult inherited indexed accessors and still uses captured intrinsics. Add a focused post-import hostile Array.prototype indexed getter/setter test covering normal encoding and cycle rejection, asserting zero invocations and stable bytes/errors.",
+        "severity": "MAJOR",
+        "title": "Internal array writes can invoke a hostile inherited setter"
+      },
+      {
+        "evidence": "The automated validation output runs dependency installation, diff check, lint, and tests only. It does not run npm run compile or npm run boundary, despite both being mandatory acceptance gates. Narrative claims in the Implementer report are insufficient independent evidence.",
+        "id": "REVIEW-002",
+        "required_change": "Run and record npm run compile and npm run boundary on the exact corrected candidate revision, with exit codes and output, alongside lint and the complete test suite.",
+        "severity": "MAJOR",
+        "title": "Required compile and boundary validation evidence is missing"
+      }
+    ],
+    "invariants_checked": [
+      "Active-path cycles are rejected with the documented stable E_CYCLE code, message, and back-edge path.",
+      "Non-cyclic shared references are encoded by value.",
+      "Plain-object enumerable accessors are rejected through descriptor inspection without direct descriptor-value access.",
+      "Canonical ordering is explicit for arrays, plain-object keys, and Set elements.",
+      "StateHash and SaveHash remain unimplemented.",
+      "The §19 contradiction protocol is represented by BLOCKER-0001.",
+      "No test skips, todos, or reported failures appear in automated validation."
+    ],
+    "risks": [
+      "A hostile Array.prototype numeric setter can execute during canonical encoding, corrupt internal bookkeeping, suppress own element creation, or cause uncontrolled behavior.",
+      "Without independently recorded compile and boundary runs, strict type safety and architecture-boundary compliance of the exact candidate cannot be established."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "Cycle/accessor behavior and focused tests are substantially implemented, but the captured-intrinsics guarantee is incomplete and required compile/boundary validation is not independently evidenced by the automated output.",
+    "task_id": "TASK-0006",
+    "validation_assessment": {
+      "missing": [
+        "Independent npm run compile output for the exact candidate state.",
+        "Independent npm run boundary output for the exact candidate state.",
+        "A hostile inherited Array.prototype indexed-accessor regression test."
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 2,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0006"
+}
