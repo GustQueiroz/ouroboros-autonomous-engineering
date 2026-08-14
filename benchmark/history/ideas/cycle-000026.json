@@ -1,0 +1,156 @@
+{
+  "created_at": "2026-08-14T01:11:05.396625+00:00",
+  "cycle_id": "CYCLE-000026",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "docs/decisions/0001-hash-function.md (ADR-002) specifies the algorithm bit-exactly: SplitMix64 over FNV-1a accumulator or equivalent, all 11 namespace constants as per §5 table, test vectors for at least three distinct inputs",
+          "docs/decisions/0002-rounding-enforcement.md (ADR-004) names the concrete technical mechanism (branded function signature or lint rule) that makes omitting a rounding mode a compile-time or blocking-lint error",
+          "docs/decisions/0003-canonical-encoder.md (ADR-009) specifies: UTF-8 byte-order key sorting recursively; bigint as signed decimal ASCII with explicit sign, no leading zeros, no exponent; distinct type marker separating safe-integer from bigint so 1n and 1 never collide; undefined/NaN/Infinity/-0 as thrown errors; StateHash excludes finalTick; SaveHash includes masterSeed, full action log, finalTick, specVersion, rulesetVersion, encodingVersion",
+          "Each ADR references the invariants it protects and closes the corresponding DEFINIR item; no economic parameter is introduced without a versioned config file reference"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§15 FASE-1 — ADR-009 written and encoder implemented before any StateHash",
+          "ADR-002 — hash function is DEFINIR, specified bit-by-bit in ADR",
+          "ADR-004 — rounding-mode enforcement mechanism is DEFINIR",
+          "§19 Protocolo de ambiguidade — ADR required before resolving any DEFINIR item",
+          "INV-22",
+          "INV-12"
+        ],
+        "title": "Write ADR-002, ADR-004, and ADR-009 before any packages/core implementation",
+        "why_now": "FASE-1 acceptance criteria explicitly require ADR-009 to be written and the CanonicalEncoder implemented before any StateHash exists. ADR-002 requires the hash function specified bit-by-bit in its own ADR before any rand() call is written. ADR-004 must resolve how omitting a rounding mode becomes a compile-time or blocking-lint error before the divInt helper can be typed correctly. All three packages/core components (RNG, encoder, division) depend on these ADRs; without them any implementation embeds silent decisions that cannot be reversed without an encodingVersion bump that invalidates frozen reference hashes. These are documentation-only changes with zero risk of regression."
+      },
+      {
+        "acceptance_targets": [
+          "SPEC_BLOCKERS.md contains BLOCKER-0001 for the §5.1 vs §13 transcendental-function contradiction with fields: identifier, status OPEN, sections in conflict (§5.1 and §13), impact (packages/world price generator blocked until fixed-point or lookup-table approach is chosen by ADR), affected work fronts (packages/world, FASE-1 price generator), origin CYCLE-000026",
+          "SPEC_BLOCKERS.md contains BLOCKER-0002 for the §14.5 tools/* dependency-edge gap with fields: identifier, status OPEN, sections in conflict (§14.5 and §15 tools/replay requirement), impact (tools/replay and tools/bench cannot import any workspace package under the current boundary graph), affected work fronts (tools/replay, tools/bench, FASE-1 acceptance), origin CYCLE-000026",
+          "No implementation of packages/world or tools/* that embeds an unregistered resolution of either blocker"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§5.1 — log-space price construction requires Math.log/Math.exp",
+          "§13 — Math.log, Math.exp, Math.sin, Math.cos, Math.pow, Math.sqrt prohibited in pure packages",
+          "§14.5 — directed graph defines edges for packages/* and apps/* only, not for tools/*",
+          "§15 FASE-1 — tools/replay required",
+          "§19 Protocolo de ambiguidade",
+          "ADR-003 — no floating point in domain"
+        ],
+        "title": "Register transcendental-function and tools/* dependency-edge blockers in SPEC_BLOCKERS.md",
+        "why_now": "Two concrete specification issues block FASE-1 implementation and are currently unregistered. First, §5.1 constructs prices in log-space (requires Math.log, Math.exp) while §13 prohibits Math.log, Math.exp, Math.sin, Math.cos in pure packages — this is a specification contradiction that blocks packages/world entirely. Second, the boundary graph in §14.5 defines no directed edges for tools/* yet tools/replay must import packages such as packages/core and packages/application to replay a save — the existing boundary checker graph.mjs already encodes tools:[] (no imports permitted) which would make the FASE-1 required tools/replay impossible. Both must be registered per §19 before any implementation that would silently resolve them."
+      },
+      {
+        "acceptance_targets": [
+          "Branded bigint nominal types Money, Quantity, Price, Rate with constructors rejecting non-bigint and fractional values; QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n constants exported",
+          "Branded number nominal type Tick and safe-integer index types with constructors rejecting NaN, Infinity, non-integer, and values outside [-(2^53-1), 2^53-1]",
+          "divInt(a, b, mode) where mode is the TRUNCATE_TOWARD_ZERO | ROUND_HALF_UP | ROUND_HALF_EVEN enum; calling without mode is a TypeScript compile error; the / operator on branded types is banned by lint",
+          "rand(masterSeed, namespace, ...coords) pure function implementing ADR-002 bit-exactly; unit tests verify identical output for identical arguments and distinct output when any single argument changes; all 11 namespace constants present in a namespaces export",
+          "CanonicalEncoder per ADR-009: stateHash() excludes finalTick (INV-22); saveHash() includes full envelope; 1n encodes distinctly from 1; undefined/NaN/Infinity/-0 throws; two logically equal state objects produce the same bytes",
+          "INV-23 property test: no safe-integer value exceeds 2^53-1 across a simulated 10-year tick range (~5.3e8 ticks)",
+          "Zero §13 lint violations inside packages/core; zero boundary violations"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002 — positional RNG, 11 namespace constants",
+          "ADR-003 — no floating point, branded Money/Quantity/Price/Rate/Tick types, QUANTITY_SCALE/PRICE_SCALE/RATE_SCALE",
+          "ADR-004 — divInt with explicit rounding mode",
+          "ADR-009 — CanonicalEncoder, stateHash, saveHash",
+          "§14.4 — packages/core: integer arithmetic, hash, RNG, fixed-point, canonical encoder",
+          "INV-12",
+          "INV-22",
+          "INV-23",
+          "INV-26"
+        ],
+        "title": "Implement packages/core — nominal types, positional RNG, integer arithmetic, CanonicalEncoder",
+        "why_now": "packages/core is the single dependency of every other pure package. Nothing in packages/world, packages/domain, packages/application, or packages/narrative can be written until core exports its nominal types, the rand() function, the divInt helper, and the CanonicalEncoder. INV-12, INV-22, and INV-23 all require core to be correct before any other invariant can be green. This is the highest-value implementation unit that has no remaining documentation blocker once IDEA-001 is accepted. All downstream FASE-1 work is serialized behind it."
+      },
+      {
+        "acceptance_targets": [
+          "Account, Entry, Transaction types with commodity declared on each Entry; Transaction constructor rejects any entry without explicit commodity; no aggregation across commodities",
+          "All mandated account identifiers present: world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, world:insurance_fund, player:cash:BRL, player:spot:<ASSET>, venue:fees, venue:funding, venue:realized_pnl, venue:liquidation_penalty",
+          "Transaction.apply() verifies per-commodity balance is zero before committing; violation throws rather than silently applying",
+          "Spot market buy and sell produce the correct four-entry transaction (BRL out/in, asset in/out) with nocional calculated in bigint per ADR-003",
+          "INV-04 property test: 1000 random valid transactions all balance per commodity",
+          "INV-05 property test: BRL sum across all accounts remains exactly zero after any sequence of spot transactions",
+          "INV-06 property test: asset quantity sum remains exactly zero for each asset",
+          "INV-07 test: rounding residue account absorbs the exact difference between truncated sum and nominal value",
+          "Zero §13 lint violations; zero boundary violations"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 — Ledger, double-entry, multi-commodity, Transaction, Entry, Account",
+          "§7 — market order in FASE-1; canonical tick processing order steps 5 and 6",
+          "§14.4 — packages/domain: ledger, orders, positions, margin, liquidation, missions",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "ADR-003",
+          "ADR-004"
+        ],
+        "title": "Implement packages/domain — double-entry multi-commodity ledger and spot market order execution",
+        "why_now": "The ledger is the second structural prerequisite of FASE-1. INV-04 (every transaction balances per commodity), INV-05 (BRL sum across all accounts is zero), INV-06 (asset quantity sum is zero), and INV-07 (rounding residue accounted) are all ledger invariants that must be green for FASE-1 acceptance. Spot market orders are the only order type required by FASE-1 and they require the ledger. packages/domain depends only on packages/core, so it can be implemented as soon as core is complete and requires no resolution of the transcendental-function blocker (IDEA-002) that affects packages/world."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main/src/index.ts creates BrowserWindow with contextIsolation:true, nodeIntegration:false, sandbox:true, a restrictive CSP, and no webSecurity:false in any code path including development",
+          "apps/desktop/preload/src/index.ts exposes only a named allowlist of IPC channels via contextBridge; no generic invoke(channel, args) channel exists",
+          "packages/contracts exports typed IPC message definitions and DTO projections shared by simulation-worker and renderer without importing application or domain",
+          "apps/desktop/simulation-worker hosts a minimal tick-loop stub that receives a typed RunTick message and replies with a typed TickResult; communication uses structured clone, not JSON.stringify over economic values",
+          "INV-29 automated test: reads BrowserWindow options from the main source and asserts all three security flags are set; runs in CI as part of the gate (§17 item 8)",
+          "Zero boundary violations: renderer imports only contracts; simulation-worker imports application and contracts; main imports adapters, ui, contracts; no cross-process package import"
+        ],
+        "category": "architecture",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.2 — Topologia de processos: simulation in worker, renderer as presentation only, main owns filesystem, typed message contract",
+          "§14.2 — Electron security: contextIsolation, nodeIntegration, sandbox, allowlist preload, CSP",
+          "§14.4 — apps/desktop/main, preload, renderer, simulation-worker; packages/contracts",
+          "§15 FASE-1 — simulation já rodando em worker dedicado com contrato de mensagem tipado",
+          "INV-29",
+          "INV-26"
+        ],
+        "title": "Implement Electron application skeleton — simulation worker, typed IPC, and Electron security (INV-29)",
+        "why_now": "FASE-1 requires that simulation already runs in a dedicated worker outside the rendering thread with a typed message contract. INV-29 requires contextIsolation:true, nodeIntegration:false, sandbox:true in all execution modes including development — this is a security invariant with a CI gate. The Electron process topology (main, preload, renderer, simulation-worker) and the contracts package shape every downstream feature because the renderer may never import domain or application packages directly. Establishing the correct process boundaries, the contextBridge allowlist, the typed IPC channel contract in packages/contracts, and the simulation-worker host now prevents architectural drift in later phases. Without this, domain and world implementations have no wiring and cannot produce an end-to-end tick."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo bootstrap accepted (TASK-0002). All 16 workspace packages exist with valid npm workspace registration, strict TypeScript, blocking ESLint purity lint, dependency-boundary checker, and CI. All package source files are empty placeholders (export {}). No production code, no ADRs, no SPEC_BLOCKERS entries, no implementations of packages/core, world, domain, application, narrative, contracts, or any Electron process.",
+      "highest_priority_gap": "packages/core is empty and three prerequisite ADRs (hash function, rounding-mode enforcement, CanonicalEncoder) have not been written. FASE-1 explicitly forbids any StateHash from existing before ADR-009 is written and the encoder implemented, and forbids any rand() implementation before ADR-002 specifies the hash function bit-by-bit. Nothing in the domain, world, application, or replay layers can be started until core exports its nominal types, RNG, and encoder."
+    },
+    "warnings": [
+      "SPECIFICATION CONFLICT — §5.1 requires log-space price construction (logPrice formula with trendLayer, marketFactor, regimeAmplitude) which implicitly requires transcendental functions; §13 explicitly prohibits Math.log, Math.exp, Math.sin, Math.cos, Math.pow, Math.sqrt in all pure packages including packages/world. The resolution (fixed-point implementation or lookup table, per §14.4 ADR-003 guidance) must come from an ADR, not from silent choice. packages/world is blocked until this is registered and resolved.",
+      "SPECIFICATION GAP — §14.5 defines directed dependency edges for packages/* and apps/* but does not define any edges for tools/*. The current boundary checker encodes tools:[] (no outbound imports permitted). tools/replay must import at minimum packages/core and packages/application to be capable of replaying a save, and tools/bench must import packages/core to calibrate performance. Both FASE-1 required tools are currently blocked by the boundary checker with no specified resolution."
+    ]
+  }
+}

@@ -1,0 +1,177 @@
+{
+  "created_at": "2026-08-14T01:06:57.346265+00:00",
+  "cycle_id": "CYCLE-000025",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "docs/decisions/0002-hash-function.md specifies SplitMix64 over FNV-1a accumulator bit-exactly: all field widths, mixing constants, 11 namespace identifiers, at least 3 test vectors; explicitly forbids native language hash",
+          "docs/decisions/0004-rounding-mode-enforcement.md specifies the concrete TypeScript mechanism (branded function parameter or lint rule) that makes omitting a rounding mode a compile-time or blocking-lint error; names all three allowed modes",
+          "docs/decisions/0009-canonical-encoder.md specifies: recursive UTF-8 byte-order key sorting; bigint as signed decimal ASCII with no leading zeros; distinct type markers for safe-integer vs bigint so 1n and 1 never collide; undefined/NaN/Infinity/-0 as thrown errors; StateHash excludes finalTick (INV-22); SaveHash includes full envelope; encodingVersion participates in hash",
+          "SPEC_BLOCKERS.md contains BLOCKER-0001: id, status OPEN, conflicting sections §5.1 and §13, impact (packages/world price generator requires Math.log/Math.exp which §13 prohibits in pure packages), affected work fronts (packages/world, FASE-1 price generator)",
+          "SPEC_BLOCKERS.md contains BLOCKER-0002: id, status OPEN, gap (§14.5 defines no outbound edges for tools/*), impact (tools/replay and tools/bench cannot import from other packages without an allowed edge), affected work fronts (tools/replay, tools/bench, FASE-1 CLI requirements)",
+          "No production algorithm, economic parameter, or DEFINIR-dependent behavior introduced beyond the three ADR documents"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§15 FASE-1 — ADR-009 written before encoder implementation",
+          "§19 Protocolo de ambiguidade — SPEC_BLOCKERS.md registration required on contradiction",
+          "ADR-002 — hash function DEFINIR, bit-spec must precede rand() implementation",
+          "ADR-004 — rounding-mode enforcement mechanism is DEFINIR",
+          "ADR-009 — CanonicalEncoder specified in own ADR before any state hash",
+          "§5.1 — log-space price construction requires Math.log, Math.exp",
+          "§13 — Math.log, Math.exp prohibited in pure packages",
+          "§14.5 — tools/* has no declared outbound edges",
+          "INV-22",
+          "INV-12"
+        ],
+        "title": "Write ADR-002, ADR-004, ADR-009 and register both open spec blockers",
+        "why_now": "FASE-1 acceptance criteria state explicitly: ADR-009 must be written and the CanonicalEncoder implemented before any StateHash exists. ADR-002 specifies the hash function bit-by-bit before any rand() implementation. ADR-004 specifies rounding-mode enforcement before the division helper can be typed correctly. All three are DEFINIR items mandated as prerequisites by §15 and §19. In parallel, the transcendental-function contradiction (§5.1 requires log-space price arithmetic via Math.log/Math.exp; §13 prohibits both in all pure packages) and the tools/* dependency-edge gap (tools: [] in the boundary graph, yet tools/replay and tools/bench must import from application/domain) are unregistered specification conflicts that block their respective work fronts. Neither packages/world nor tools/* can acquire cross-workspace imports until these are in SPEC_BLOCKERS.md."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate exported as bigint branded types; constructors reject non-bigint and non-integer inputs at TypeScript type level; QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE constants declared",
+          "Tick and internal noise/index types exported as number nominal types; constructors reject NaN, Infinity, non-integer, and values outside safe-integer range",
+          "divInt(a, b, mode) where mode is the three-value enum from ADR-004; omitting mode is a TypeScript compile error or blocking lint error; / and ** operators banned on branded numeric types by lint",
+          "rand(masterSeed, namespace, ...coords) pure function implementing ADR-002 bit-exactly; all 11 namespace constants in a namespaces file; unit tests verify identical output for identical inputs and sensitivity to each argument and namespace change",
+          "CanonicalEncoder per ADR-009: stateHash() excludes finalTick (INV-22 verified by test); saveHash() includes full envelope; 1n and 1 encode differently; undefined/NaN/-0 throws; two logically equal states produce equal byte sequences",
+          "INV-23 property test: no safe-integer overflow in any arithmetic path over simulated 10-year tick range (max tick ~5.3e8)",
+          "Zero §13 lint violations in packages/core; zero imports beyond the allowed dependency graph"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002 — positional RNG, namespace constants",
+          "ADR-003 — no floating point; Money/Quantity/Price/Rate as bigint; Tick as safe-integer number",
+          "ADR-004 — divInt with explicit rounding mode",
+          "ADR-009 — CanonicalEncoder: stateHash, saveHash",
+          "§4 Glossário travado — canonical type names",
+          "§14.4 — packages/core scope",
+          "INV-12",
+          "INV-22",
+          "INV-23"
+        ],
+        "title": "Implement packages/core: branded numerics, positional RNG, division helper, CanonicalEncoder",
+        "why_now": "packages/core is the sole dependency of every other pure package. Without branded Money/Quantity/Price/Rate (bigint) and Tick (safe-integer number) types, ADR-003 and ADR-004 have no enforcement and violations accumulate from the first file written in any dependent package. Without rand() implementing ADR-002 bit-exactly, packages/world cannot begin. Without CanonicalEncoder implementing ADR-009, no StateHash can be computed and INV-01, INV-22, and every hash-dependent invariant have no foundation. This is the first implementation step after the ADRs are accepted."
+      },
+      {
+        "acceptance_targets": [
+          "price(assetId, tick): Price is a pure function with no mutable state; 2-octave fractal noise via positional rand with linear interpolation at block vertices; transcendental functions implemented per the ADR resolving BLOCKER-0001 with bit-identical cross-platform results; parameters in a versioned config file; INV-02 test passes for 1000 random (assetId, tick) pairs",
+          "Every Transaction validates per-commodity Entry sum is exactly zero; all minimum accounts from §6 declared; rounding residue posted per commodity with causationId; INV-13 enforced by explicit total ordering; INV-04, INV-05, INV-06, INV-07 verified by unit and property tests",
+          "Market buy and sell spot orders produce four-entry transactions balancing BRL and asset commodities separately; fee posted to venue:fees; slippage deterministic and consistent with ADR-003",
+          "application.processTick implements the locked 10-step sequence from §7 in a single readable function; test verifies step ordering is exactly that sequence",
+          "Save structure per ADR-006 with specVersion, rulesetVersion, encodingVersion, masterSeed, finalTick, actions; INV-21 enforced on load (finalTick >= max action tick, (tick,sequence) unique); INV-01 verified: replay of a reference save produces identical StateHash at every tick compared to live session"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-003",
+        "risk": "high",
+        "spec_refs": [
+          "§5.1 — 2-octave fractal noise, positional, O(1)",
+          "§6 — double-entry multi-commodity ledger, minimum accounts",
+          "§7 — 10-step canonical tick order TRAVADO",
+          "§14.5 — world and domain composed only in application",
+          "ADR-003",
+          "ADR-005",
+          "ADR-006",
+          "ADR-007 — effectivePrice lives in world",
+          "INV-01",
+          "INV-02",
+          "INV-03",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-13",
+          "INV-21",
+          "INV-22"
+        ],
+        "title": "Implement packages/world (2-octave price generator), packages/domain (ledger + spot orders), packages/application (canonical tick loop and save)",
+        "why_now": "These three packages compose the functional core required by FASE-1. The 2-octave positional price generator in packages/world delivers INV-02. The double-entry multi-commodity ledger in packages/domain delivers INV-04 through INV-07. The canonical 10-step tick loop in packages/application (§7, TRAVADO sequence) is listed explicitly in FASE-1 acceptance criteria, and it is the only layer that legally composes world and domain. The save structure per ADR-006 enables tools/replay. None of these invariants are independently verifiable — they become testable only when composed through application. This work requires the transcendental-function blocker (BLOCKER-0001 from IDEA-001) to be resolved via ADR before packages/world implements the price generator, because §13 prohibits Math.log/Math.exp in pure packages and packages/world is pure."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main hosts window lifecycle and IPC; apps/desktop/preload exposes only a named allowlist via contextBridge; contextIsolation:true, nodeIntegration:false, sandbox:true verified by automated test against INV-29",
+          "apps/desktop/simulation-worker hosts the application package; typed message contract in packages/contracts defines all IPC channels; no channel accepts an untyped generic invoke",
+          "apps/desktop/renderer consumes only packages/contracts projections; it does not import packages/application, packages/domain, or packages/world",
+          "Minimal React UI displays a lightweight-charts price chart, player BRL balance, buy and sell buttons, and pause/1x time controls in Portuguese",
+          "CI produces a minimal installer for Windows and Linux via electron-builder; the installer opens a window without crashing (acceptance: exit code 0 from build step)"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.1 — Electron desktop, electron-builder",
+          "§14.2 — simulation in worker, renderer somente apresentação, main owns filesystem",
+          "§14.2 — contextIsolation:true, nodeIntegration:false, sandbox:true, preload allowlist, no unsafe-eval",
+          "§14.6 — instalador mínimo para Windows e Linux existe na FASE-1",
+          "§15 FASE-1 — simulação rodando em worker dedicado com contrato de mensagem tipado",
+          "§15 FASE-1 — interface mínima: gráfico, saldo, comprar/vender, pausa/1x",
+          "INV-29"
+        ],
+        "title": "Electron shell: main process, preload contextBridge, simulation-worker IPC contract, minimal UI",
+        "why_now": "FASE-1 acceptance criteria explicitly require: simulation running in a dedicated worker outside the render thread with a typed message contract. INV-29 requires contextIsolation active, nodeIntegration off, and sandbox active, verified by CI. The minimal interface (chart, balance, buy/sell, pause/1x controls) is also a stated FASE-1 deliverable. A minimal installer stub requires a working Electron main to exist. Deferring this to later phases means discovering ABI, module-native, and process-boundary problems after the domain simulation is already built and harder to restructure."
+      },
+      {
+        "acceptance_targets": [
+          "tools/replay accepts two save file paths, replays both via packages/application, computes StateHash at every tick using packages/core CanonicalEncoder, and reports the first tick where hashes diverge or confirms equality; exits nonzero on divergence",
+          "tools/bench runs a calibration micro-benchmark of known fixed cost, then runs price(asset, tick), processTick with 10 open positions, and a 525600-tick replay; records p95 latency for each; freezes the calibration ratio in a versioned JSON file",
+          "tools/bench exits nonzero if any ratio exceeds its frozen reference by more than 20%",
+          "Both tools satisfy the tools/* allowed import edges resolved by BLOCKER-0002; zero boundary violations in the committed repository after this task"
+        ],
+        "category": "tooling",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-005",
+        "risk": "low",
+        "spec_refs": [
+          "§15 FASE-1 — tools/replay compara duas execuções e reporta o primeiro tick divergente",
+          "§15 FASE-1 — tools/bench com calibração e razões de referência congeladas",
+          "§17 Gate de CI — replay de três partidas de referência com comparação de StateHash por tick",
+          "§18 — protocolo de medição: calibração, razões relativas, percentil 95",
+          "§18 — regressão acima de 20% na razão bloqueia entrega",
+          "INV-01",
+          "INV-19"
+        ],
+        "title": "Implement tools/replay (divergence reporter) and tools/bench (calibration baseline)",
+        "why_now": "Both tools/replay and tools/bench are explicit FASE-1 acceptance criteria. tools/replay must replay two save files and report the first tick where StateHash diverges — this is the primary regression instrument for INV-01. tools/bench must establish the calibration micro-benchmark, the reference ratios against which all performance lines are measured, and freeze them in a versioned file; without frozen ratios the performance budget from §18 has no enforcement mechanism. The tools/* dependency edge gap (BLOCKER-0002 from IDEA-001) must be resolved before either tool can import from packages/application."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "TASK-0002 accepted and committed (f900c10): npm workspaces monorepo with all 16 mandated packages, strict TypeScript, determinism lint, boundary checker, and CI are all operational. Every package contains only an empty stub (export {}). No ADRs have been written, SPEC_BLOCKERS.md has no registered entries, and no production code exists in any package.",
+      "highest_priority_gap": "Zero ADRs written. FASE-1 acceptance criteria explicitly require ADR-009 to be written and the CanonicalEncoder implemented before any StateHash exists. ADR-002 and ADR-004 are prerequisites for packages/core. Additionally, two spec contradictions remain unregistered in SPEC_BLOCKERS.md: the transcendental-function conflict (§5.1 vs §13) and the tools/* dependency-edge gap (§14.5 defines no allowed outbound edges for tools, yet tools/replay and tools/bench must import from other packages to fulfil their FASE-1 mandate)."
+    },
+    "warnings": [
+      "SPEC CONTRADICTION (unregistered) — §5.1 constructs prices in log-space requiring Math.log and Math.exp; §13 prohibits Math.log and Math.exp in all pure packages (packages/world is pure). This conflict has been identified since CYCLE-000024 but is still absent from SPEC_BLOCKERS.md. It must be registered per §19 before any packages/world implementation proceeds. An ADR specifying a fixed-point or lookup-table implementation with bit-identical cross-platform results is required to close it.",
+      "DEFINIR GAP (unregistered) — §14.5 defines directed edges only for packages/ and apps/. tools/* is mapped to DIRECT_EDGES.tools = [] in the committed boundary graph, meaning tools/replay and tools/bench currently have no allowed outbound imports. Both tools must import from packages/application to fulfil their FASE-1 acceptance criteria. The allowed edges for tools/* must be registered in SPEC_BLOCKERS.md and resolved via ADR or provisional decision before those tools acquire any cross-workspace imports.",
+      "DEFINIR ITEMS not yet addressed — ADR-002 (hash function), ADR-004 (rounding-mode enforcement mechanism), and ADR-009 (CanonicalEncoder) are all explicitly required before their corresponding implementations. §15 FASE-1 states: 'ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir.' None of the three ADR files exist in docs/decisions/.",
+      "OCTAVE PARAMETERS unresolved — the number of octaves, periods, and amplitudes for trendLayer and idiosyncraticNoise are DEFINIR per §5.1 and must be fixed in a versioned configuration file with an ADR before packages/world implements the price generator. Post-implementation changes require an encodingVersion bump and invalidate all frozen reference StateHashes.",
+      "BENCHMARK VELOCITY — 25 ideation cycles have elapsed. TASK-0002 (npm workspaces bootstrap) was the first accepted production commit. All packages remain empty stubs. FASE-1 requires packages/core, packages/world, packages/domain, packages/application, a minimal Electron UI, tools/replay, tools/bench, and a working installer. The ADR prerequisite gate (IDEA-001) is the immediate critical path blocker."
+    ]
+  }
+}
