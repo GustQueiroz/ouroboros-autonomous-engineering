@@ -1,0 +1,79 @@
+{
+  "created_at": "2026-08-14T02:44:44.607524+00:00",
+  "cycle_id": "CYCLE-000043",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase. The accepted repository bootstrap leaves packages/core stubbed, and ADR-009 plus canonical encoding is an explicit prerequisite to StateHash and replay comparison. This is the smallest coherent current-phase unit and must precede dependent RNG, world, ledger, and replay work.",
+    "risks": [
+      "An underspecified ADR could make persisted bytes implementation-dependent and force a breaking encoding-version migration.",
+      "Ambiguous unordered-collection or Unicode-key semantics could create cross-runtime replay divergence.",
+      "The previously stalled encoder task indicates delivery risk; keeping StateHash and unrelated core primitives out of scope is necessary to maintain reviewability."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "ADR-009 exists under docs/decisions and specifies enough byte-level detail, including type tags and framing, for an independent implementation to reproduce identical bytes.",
+        "The implementation contains no encoding decision absent from ADR-009; ADR-009 is committed in the same change before or with code depending on it.",
+        "Logically equal supported objects encode to byte-identical output regardless of property insertion order.",
+        "Object keys are ordered by their UTF-8 byte sequences using a locale-independent comparison; tests include keys for which locale or UTF-16 ordering would give a different result.",
+        "Safe integers use a type marker distinct from bigint; non-integer numbers and integers outside Number safe-integer bounds are rejected deterministically.",
+        "Bigints use the ADR-defined signed decimal ASCII representation with an explicit sign and cannot collide with safe-integer encodings.",
+        "undefined, NaN, positive and negative Infinity, and negative zero each produce an explicit deterministic error and are never normalized.",
+        "Ordered collections preserve element order; every supported unordered collection is canonicalized using the exact sorting rule recorded in ADR-009.",
+        "Changing encodingVersion changes the canonical byte sequence for the same supported value.",
+        "The encoder does not read time, randomness, locale, environment, filesystem, network, or mutable global state.",
+        "No StateHash API or finalTick-specific behavior is introduced by this change.",
+        "Repository lint, strict typecheck, dependency-boundary checks, and all pre-existing tests pass."
+      ],
+      "cycle_id": "CYCLE-000043",
+      "must_preserve": [
+        "All accepted monorepo bootstrap tests and checks remain green.",
+        "Existing workspace and dependency boundaries remain unchanged.",
+        "Pure packages remain free of nondeterministic APIs and forbidden dependencies.",
+        "INV-22 requirement that equal logical states can yield equal canonical bytes; StateHash must later exclude finalTick outside this encoder."
+      ],
+      "objective": "Specify and implement a versioned byte-level canonical encoding whose output depends only on the supported logical value and encodingVersion.",
+      "out_of_scope": [
+        "StateHash implementation or finalTick filtering logic.",
+        "Positional RNG, branded domain numeric types, ledger, price generation, Electron scaffolding, UI, and installer work.",
+        "Support for types not explicitly admitted by ADR-009.",
+        "Changes to CICLO_SPEC.md, unrelated workspaces, or existing dependency-boundary architecture."
+      ],
+      "required_adrs": [
+        "ADR-009: CanonicalEncoder byte-level encoding"
+      ],
+      "required_tests": [
+        "Golden-vector tests asserting exact bytes for every supported primitive and container type, nesting, empty values, UTF-8 keys, integer boundaries, signed bigint values, and encodingVersion.",
+        "Permutation tests showing identical bytes for logically equal objects created with different insertion orders.",
+        "UTF-8 byte-order tests that would fail under localeCompare or UTF-16 code-unit sorting.",
+        "Rejection tests for undefined in every admitted position, NaN, both infinities, negative zero, fractional numbers, unsafe integers, unsupported values, and cyclic structures if containers can cycle.",
+        "Collision tests distinguishing safe integers from bigint and structurally different nested values.",
+        "Ordered-collection tests proving order affects bytes and unordered-collection tests proving insertion order does not affect bytes.",
+        "Run the repository test suite, lint, strict typecheck, and dependency-boundary validation."
+      ],
+      "scope": [
+        "Write ADR-009 with an independently reproducible byte grammar, type markers, length framing, UTF-8 rules, object-key ordering, integer and bigint representations, collection semantics, prohibited values, and encodingVersion participation.",
+        "Implement CanonicalEncoder in packages/core for exactly the value types admitted by ADR-009.",
+        "Define deterministic, explicit error behavior for unsupported or prohibited inputs.",
+        "Export the encoder and its public error/types through the existing packages/core public entry point.",
+        "Add focused unit and determinism tests for the ADR-defined format."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §3 ADR-009",
+        "CICLO_SPEC.md §14.4 packages/core scope",
+        "CICLO_SPEC.md §15 FASE-1 acceptance",
+        "CICLO_SPEC.md §19 DEFINIR decision discipline",
+        "CICLO_SPEC.md INV-22",
+        "BENCHMARK.md acceptance and determinism requirements"
+      ],
+      "task_id": "TASK-0004",
+      "title": "Define ADR-009 and implement deterministic CanonicalEncoder"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0004",
+  "title": "Define ADR-009 and implement deterministic CanonicalEncoder"
+}
