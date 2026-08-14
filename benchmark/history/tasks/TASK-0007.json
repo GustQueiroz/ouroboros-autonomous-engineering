@@ -1,0 +1,79 @@
+{
+  "created_at": "2026-08-14T08:31:15.055220+00:00",
+  "cycle_id": "CYCLE-000079",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase. Its canonical-encoding prerequisite is absent, and ADR-009 must define the unresolved encoding decisions before any StateHash or SaveHash implementation. This is the smallest dependency-opening unit and is preferred over later ledger, RNG, Electron, and packaging work.",
+    "risks": [
+      "An incomplete ADR could freeze an ambiguous format and later invalidate replay or save compatibility.",
+      "Unbounded or accidentally admitted JavaScript object types could introduce runtime- or platform-dependent encodings.",
+      "The repeated history of passing but uncommitted encoder work indicates a process risk outside implementation correctness."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "ADR-009 is committed and specifies the encoding bit-for-bit, including encodingVersion framing, type tags, length framing, UTF-8 object-key ordering applied recursively, integer and bigint representations, ordered and unordered collection treatment, supported value types, duplicate/collision handling, and all rejection cases.",
+        "packages/core exports canonicalEncode(state, encodingVersion) returning Uint8Array and CanonicalEncoderError.",
+        "Logically equal supported states, including states whose object properties were inserted in different orders, encode to byte-identical output.",
+        "Each tested logically distinct state encodes differently, including bigint 1n versus number 1, different nesting, different collection kinds, and values that would collide under delimiter-free concatenation.",
+        "Changing encodingVersion changes the encoded bytes for the same state.",
+        "Undefined, NaN, Infinity, -Infinity, negative zero, unsafe integer numbers, cyclic structures, and every value type excluded by ADR-009 throw CanonicalEncoderError.",
+        "Unordered collections encode identically across insertion orders according to ADR-009; ordered collections preserve order and encode differently when order changes.",
+        "No StateHash, SaveHash, RNG, ledger, world, application, or Electron implementation is introduced.",
+        "Repository typecheck, lint, existing architecture-boundary checks, and the complete existing test suite pass."
+      ],
+      "cycle_id": "CYCLE-000079",
+      "must_preserve": [
+        "All existing determinism lint rules and tests remain green.",
+        "All existing package dependency-boundary rules and tests remain green.",
+        "packages/core remains independent of world, domain, application, adapters, UI, and Electron packages.",
+        "Encoding is deterministic and does not depend on locale, runtime object insertion order, current time, randomness, native object hashing, or platform endianness.",
+        "No hash of state exists before ADR-009 and the canonical encoder are accepted."
+      ],
+      "objective": "Commit ADR-009 and a deterministic, versioned canonical encoder in packages/core that provides unambiguous bytes for supported state values before any state hash is introduced.",
+      "out_of_scope": [
+        "StateHash, SaveHash, cryptographic or non-cryptographic hash functions.",
+        "Positional RNG and RNG namespace definitions.",
+        "Nominal economic types, rounding helpers, ledger behavior, Electron, packaging, or CI installer changes.",
+        "Supporting state value types not explicitly admitted by ADR-009.",
+        "Changes to CICLO_SPEC.md or unrelated packages and tooling."
+      ],
+      "required_adrs": [
+        "ADR-009: normative canonical encoder format and supported value domain"
+      ],
+      "required_tests": [
+        "Unit test logically equal recursively nested states with different object insertion orders produce identical bytes.",
+        "Unit tests for distinct primitives, type distinctions, nesting distinctions, and length-framing ambiguity cases producing distinct bytes.",
+        "Unit test bigint 1n and safe-integer number 1 produce distinct bytes.",
+        "Unit tests undefined, NaN, Infinity, -Infinity, negative zero, unsafe integer numbers, cyclic references, and ADR-excluded types each throw CanonicalEncoderError.",
+        "Unit tests ordered collection reordering changes bytes and unordered collection insertion-order changes do not.",
+        "Unit test changing encodingVersion changes bytes.",
+        "Run the repository typecheck, lint, architecture-boundary validation, and full test commands."
+      ],
+      "scope": [
+        "Write docs/decisions/0009-canonical-encoder.md with a complete normative wire format, supported value domain, recursive UTF-8 key ordering, numeric representations, collection ordering, version inclusion, and error behavior.",
+        "Implement and export canonicalEncode(state, encodingVersion): Uint8Array from packages/core.",
+        "Implement and export a dedicated CanonicalEncoderError.",
+        "Use explicit type and length framing so distinct supported values and structures cannot share an encoding through concatenation ambiguity.",
+        "Reject unsupported or non-canonical values, including undefined, NaN, positive and negative Infinity, negative zero, unsafe number integers, and cyclic structures.",
+        "Add focused unit tests for deterministic equality, structural distinction, recursive key ordering, numeric type separation, collection ordering, version separation, invalid values, and ambiguous-boundary cases."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §3 ADR-009",
+        "CICLO_SPEC.md §15 FASE-1 acceptance criterion requiring ADR-009 and the encoder before state hashing",
+        "CICLO_SPEC.md INV-22",
+        "CICLO_SPEC.md §14.4 packages/core",
+        "CICLO_SPEC.md §16 Definition of Done items 1 and 6",
+        "CICLO_SPEC.md §19 DEFINIR resolution discipline"
+      ],
+      "task_id": "TASK-0007",
+      "title": "Specify and implement canonical state encoding"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0007",
+  "title": "Specify and implement canonical state encoding"
+}

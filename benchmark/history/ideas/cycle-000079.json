@@ -1,0 +1,148 @@
+{
+  "created_at": "2026-08-14T08:30:12.487596+00:00",
+  "cycle_id": "CYCLE-000079",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "docs/decisions/0009-canonical-encoder.md committed and specifies: key ordering by UTF-8 byte comparison applied recursively; bigint as decimal ASCII with explicit sign, no leading zeros, no exponent; safe-integer type marker distinct from bigint so 1n and 1 never collide; undefined/NaN/Infinity/-0 throw CanonicalEncoderError rather than normalizing silently; ordered vs unordered collection encoding with normative ordering for unordered; encodingVersion participates in hash",
+          "packages/core/src exports canonicalEncode(state, encodingVersion) returning Uint8Array",
+          "Unit test: two logically equal states produce identical bytes",
+          "Unit test: two logically different states produce different bytes",
+          "Unit test: bigint 1n and safe-integer 1 produce distinct byte sequences",
+          "Unit test: undefined, NaN, Infinity, -0 each throw rather than silently normalize",
+          "No StateHash or SaveHash implementation is added in this task — encoder only"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-009 (§3)",
+          "§15 FASE-1 acceptance criteria — 'ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir'",
+          "INV-22",
+          "§16 Definition of Done item 1 and 6",
+          "§14.4 packages/core"
+        ],
+        "title": "Write ADR-009 and implement CanonicalEncoder in packages/core",
+        "why_now": "FASE-1 acceptance criteria explicitly state 'ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir'. The repository contains no ADRs and no product code. StateHash and SaveHash — both mandatory for FASE-1 invariants INV-01, INV-22 — cannot be computed without this encoder. Multiple prior implementation attempts (TASK-0004, TASK-0005, TASK-0006) reported all acceptance criteria passing but were never committed; the encoder remains unimplemented in the repository. This is the deepest unresolved blocker for all of FASE-1."
+      },
+      {
+        "acceptance_targets": [
+          "ADR committed to docs/decisions/ specifying the algorithm bit-by-bit — recommended starting point: SplitMix64 over FNV-1a accumulator of arguments",
+          "rand(masterSeed, namespace, ...coordinates) exported from @ciclo/core as a pure function returning a safe-integer (uint53) with no mutable state",
+          "All 11 namespaces from the ADR-002 table defined as typed string-literal constants",
+          "Test: rand(seed, ns, a, b) === rand(seed, ns, a, b) for 10 000 distinct input combinations",
+          "Test: rand result queried directly at a high coordinate equals the value reached from coordinate 0 (positional, not sequential)",
+          "Lint passes: no Math.random, no stateful PRNG, no Date, no crypto"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 (§3) — DEFINIR: hash function, two constraints: bit-by-bit ADR, not native language hash",
+          "§19 DEFINIR items: 'função de hash'",
+          "§15 FASE-1 acceptance criteria",
+          "INV-02",
+          "INV-12",
+          "§14.4 packages/core"
+        ],
+        "title": "Write hash function ADR and implement positional RNG in packages/core",
+        "why_now": "ADR-002 marks the hash function choice as DEFINIR and requires it specified bit-by-bit in an ADR before implementation. The positional RNG is the foundation of all world determinism — price generation, macro events, bots, NPC tips. No namespace from the ADR-002 table (market.trend, market.factor, market.regime, macro.schedule, bot.policy, etc.) can be sampled without this. It is independent of the CanonicalEncoder and can proceed in parallel or immediately after IDEA-001."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate exported as bigint nominal types with PRICE_SCALE=10_000, QUANTITY_SCALE=100_000_000, RATE_SCALE=100_000_000",
+          "Tick exported as safe-integer nominal type; constructor rejects non-integer and values outside [-(2^53-1), 2^53-1]",
+          "divide(dividend, divisor, mode: RoundingMode) exported where RoundingMode is TRUNCATE_TOWARD_ZERO | ROUND_HALF_UP | ROUND_HALF_EVEN; calling without mode is a TypeScript compile error",
+          "Notional conversion formula (quantityRaw * priceRaw) / (QUANTITY_SCALE * PRICE_SCALE) computable in bigint with no intermediate float",
+          "Property test: no Tick or noise counter value exceeds 2^53 across a simulated 10-year tick range (INV-23)",
+          "Raw number is not assignable to Money or any other branded type at the TypeScript compiler level"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003 (§3) — Money/Quantity/Price/Rate as bigint brands, Tick as safe-number brand",
+          "ADR-004 (§3) — explicit rounding modes, no implicit division",
+          "§4 type table and scales: QUANTITY_SCALE=100_000_000, PRICE_SCALE=10_000, RATE_SCALE=100_000_000",
+          "INV-23",
+          "§14.4 packages/core"
+        ],
+        "title": "Implement nominal numeric types and division helper in packages/core",
+        "why_now": "ADR-003 requires Money, Quantity, Price, Rate as branded bigint types and Tick as a branded safe-integer type. Without these types and their validating constructors, no ledger, order, price calculation, or division operation can be written in a spec-compliant, type-safe way. ADR-004 requires all division to declare a rounding mode at the call site; calling divide without a mode must be a compile error. These three types and the helper are prerequisites for every economic computation in domain and world."
+      },
+      {
+        "acceptance_targets": [
+          "electron and electron-builder added as dependencies in apps/desktop/main",
+          "BrowserWindow created with contextIsolation: true, nodeIntegration: false, sandbox: true in all configurations including development",
+          "Preload exposes only a named typed allowlist via contextBridge — no generic invoke(channel, args) channel",
+          "Renderer displays the §20 mandatory disclaimer in Portuguese permanently",
+          "Content Security Policy set with no unsafe-eval and no remote resource loading",
+          "CI produces a Windows .exe or .nsis installer and a Linux .AppImage or .deb artifact",
+          "Automated INV-29 verification reads the BrowserWindow webPreferences and asserts the required flags in a test or CI step"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.6 packaging — instalador mínimo na FASE-1",
+          "§15 FASE-1 acceptance criteria — 'Instalador mínimo para Windows e Linux produzido pelo CI'",
+          "§14.2 Electron security (TRAVADO) — contextIsolation:true, nodeIntegration:false, sandbox:true",
+          "INV-29",
+          "§20 mandatory disclaimer"
+        ],
+        "title": "Add minimal Electron application with INV-29 security config and CI installer",
+        "why_now": "FASE-1 acceptance criteria require a minimal installer for Windows and Linux produced by CI, even if the application shows only the §20 disclaimer. The spec warns explicitly that deferring packaging exposes ABI, native module, and path problems in the final week with no time to fix architecture. Currently Electron is not a dependency anywhere in the monorepo. This is the one FASE-1 deliverable that is fully independent of core, world, domain, and application logic."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction, Entry, Account types implemented with commodity declared on each Entry; Entry without explicit commodity is a TypeScript compile error",
+          "Per-commodity balance enforcement: for each commodity in a Transaction, sum of Entry amounts for that commodity === 0n",
+          "All minimum accounts from §6 defined: world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, world:insurance_fund, player:cash:BRL, player:spot:<ASSET>, player:margin:<INSTRUMENT>, venue:fees, venue:funding, venue:realized_pnl, venue:liquidation_penalty",
+          "Market order (buy and sell spot) produces four entries across two commodities, all balancing to zero per commodity",
+          "Rounding residue from every division is routed to world:rounding_residue:<COMMODITY> and never discarded (INV-07)",
+          "Property test: arbitrary sequences of transactions never produce a non-zero per-commodity sum (INV-04)",
+          "Unit tests for INV-05 (BRL sum zero) and INV-06 (asset quantity sum zero) over a fixed sequence of spot trades",
+          "No import from world or application — INV-26 respected"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "low",
+        "spec_refs": [
+          "§6 Ledger — Transaction, Entry, Account, multi-commodity balance per commodity",
+          "§7 canonical tick order steps 5 and 6",
+          "§15 FASE-1 acceptance criteria",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-26 — domain does not import world"
+        ],
+        "title": "Implement multi-commodity double-entry ledger in packages/domain",
+        "why_now": "FASE-1 requires ledger, market orders (buy and sell spot), and INV-04 through INV-07. The ledger is the economic backbone of every tick: every order execution, fee, and rounding residue flows through it. Without it, the canonical tick loop cannot be assembled and end-to-end replay cannot be tested. This proposal is unblocked once nominal types from IDEA-003 exist in packages/core."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Infrastructure is fully in place: monorepo, TypeScript strict config, ESLint determinism lint rules with test coverage, dependency boundary enforcer with test coverage, and CI scaffold. All 8 domain packages (core, world, domain, application, narrative, contracts, adapters, ui), all 4 Electron process packages (main, preload, renderer, simulation-worker), and all 3 tool packages (replay, bench, package) contain only empty stubs (export {}). No ADRs have been written. No product code has been committed. Multiple implementations of ADR-009 and CanonicalEncoder (TASK-0004, TASK-0005, TASK-0006) reportedly passed all acceptance criteria including compile, lint, boundary, and test gates, but none was committed to the repository across 28 checkpoints and 79 cycles.",
+      "highest_priority_gap": "packages/core contains no implementation whatsoever — no CanonicalEncoder, no branded types, no positional RNG, no division helper. FASE-1 acceptance explicitly requires 'ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir'. Without core, no state hash can be computed and invariants INV-01 through INV-07, INV-22, and INV-23 cannot be tested. Every other FASE-1 deliverable (world price generator, domain ledger, canonical tick loop, replay CLI) has a direct dependency on core."
+    },
+    "warnings": [
+      "The benchmark has completed 79 cycles and 28 checkpoints with zero accepted implementation changes (status: NO_ACCEPTED_CHANGES in every checkpoint). Multiple implementations of ADR-009 and CanonicalEncoder (TASK-0004, TASK-0005, TASK-0006) reported all acceptance criteria passing, including compile, lint, boundary checks, and 167–171 tests passing, yet none was committed to the repository. The root cause of the acceptance failure is unknown to the Ideator and is a process-level issue, not a code quality issue. If this pattern continues, no FASE-1 acceptance criteria will ever be met regardless of implementation quality.",
+      "No DEFINIR item has been resolved by an ADR despite the explicit FASE-1 acceptance requirement for at minimum ADR-009 (CanonicalEncoder specification) and the hash function ADR (ADR-002 DEFINIR). Until an ADR is committed, any implementation of those items lacks a normative specification and cannot be reviewed for correctness against the spec."
+    ]
+  }
+}

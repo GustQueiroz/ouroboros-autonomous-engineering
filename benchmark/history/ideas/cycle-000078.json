@@ -1,0 +1,139 @@
+{
+  "created_at": "2026-08-14T08:25:58.686493+00:00",
+  "cycle_id": "CYCLE-000078",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Number.MAX_SAFE_INTEGER and Number.NaN are captured into module-level const bindings at module initialization; no live Number property read occurs at call time during array traversal or cycle detection.",
+          "A focused post-import monkeypatch test installs a throwing/counting accessor on Number.MAX_SAFE_INTEGER, exercises canonical array encoding and cycle rejection, and asserts zero accessor invocations and unchanged output.",
+          "Validation evidence includes independently captured exit codes and complete terminal output of npm run compile and npm run boundary on the exact corrected candidate state, alongside lint and the full test suite.",
+          "All pre-existing tests continue to pass. No StateHash or SaveHash implementation is added."
+        ],
+        "category": "bug",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-009 — CanonicalEncoder, captured intrinsics, no user code execution",
+          "§12 INV-22 — canonical-byte equality",
+          "§15 FASE-1 — ADR-009 and encoder complete before any StateHash",
+          "§17 CI Gate — replay of three reference saves with per-tick StateHash comparison"
+        ],
+        "title": "Close TASK-0006 review-03: capture Number constants and supply compile+boundary evidence",
+        "why_now": "TASK-0006 has been rejected through three successive reviews. Exactly two MAJOR findings remain from review-03: (1) canonical.ts reads Number.MAX_SAFE_INTEGER and Number.NaN from the live global at call time inside capturedParseInt10, violating the no-user-code-execution and captured-intrinsics guarantees of ADR-009; (2) the validation evidence supplies no independently captured output for npm run compile or npm run boundary on the corrected candidate. Both fixes are mechanical and narrowly scoped. CanonicalEncoder acceptance is a hard prerequisite for StateHash, which in turn gates INV-01, INV-22, and the FASE-1 CI replay gate. Every FASE-1 hash-dependent deliverable remains blocked until this task is accepted."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate exported from @ciclo/core as bigint branded types with constructors that reject non-bigint input at the type level.",
+          "Tick exported as safe-integer number branded type; constructor rejects values outside [-(2^53-1), 2^53-1].",
+          "QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n exported as bigint constants.",
+          "mulDiv helper with explicit RoundingMode enum implements TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, and ROUND_HALF_EVEN; returns {result, residue} so callers can route residue correctly.",
+          "Unit tests cover each rounding mode, boundary values, and zero-residue cases. Lint, compile, and boundary pass on the candidate."
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003 — no floating point in domain, bigint nominal branding, QUANTITY_SCALE/PRICE_SCALE/RATE_SCALE",
+          "§3 ADR-004 — every division declares TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, or ROUND_HALF_EVEN; residue to world:rounding_residue",
+          "§12 INV-24 — no safe-integer overflow in Tick arithmetic",
+          "§13 — float literals and number for economic values prohibited in pure packages"
+        ],
+        "title": "Implement branded numeric types and rounding-mode helpers in @ciclo/core",
+        "why_now": "Once CanonicalEncoder is accepted, the next FASE-1 prerequisite is the fixed-point arithmetic foundation. Money, Quantity, Price, Rate, and Tick are referenced throughout domain, world, and ledger code. Nothing in those packages can be written without stable, lint-passing type definitions and arithmetic helpers. This is dependency-ready immediately after CanonicalEncoder acceptance."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/ADR-002-hash-function.md filed; resolves the DEFINIR item by adopting SplitMix64 over FNV-1a or a documented alternative with rationale.",
+          "rand(masterSeed: bigint, namespace: Namespace, ...coordinates: bigint[]) -> bigint exported from @ciclo/core; result is identical for any call order (no state dependency).",
+          "All 10 ADR-002 namespace string literals enumerated as a Namespace union type.",
+          "Querying tick 9,000,000 directly produces the same output as would result from sequentially advancing (no mutable state path exists in the implementation).",
+          "Unit tests verify namespace isolation, coordinate sensitivity, seed sensitivity, and the direct-vs-sequential equivalence guarantee. Lint, compile, and boundary pass."
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-002 — positional randomness, 10 namespaces, O(1) query, no PRNG state, Math.random prohibited",
+          "§3 ADR-002 DEFINIR — hash function (recommendation: SplitMix64 over FNV-1a accumulator)",
+          "§12 INV-11 — no external entropy; all IDs and random draws from positional RNG",
+          "§19 — DEFINIR items resolved by ADR"
+        ],
+        "title": "Implement positional RNG per ADR-002 and file ADR for hash function selection",
+        "why_now": "ADR-002 mandates a positional, O(1), seed-deterministic rand(masterSeed, namespace, ...coordinates) function with no PRNG state. All 10 registered namespaces (market.trend, market.factor, market.regime, macro.schedule, macro.payload, bot.policy, bot.decision, npc.tip.truth, npc.tip.payload, quest.roll, venue.liquidity) must be enumerated. The hash function is DEFINIR; proceeding requires an ADR resolving it (SplitMix64 over FNV-1a is the documented recommendation). RNG is required before any price generation, macro events, or bot decisions can be implemented. Filing the ADR first keeps the resolution auditable and avoids a SPEC_BLOCKERS entry."
+      },
+      {
+        "acceptance_targets": [
+          "Property test for INV-22: generates random pairs of logically equal acyclic values (by construction, not comparison) across all supported types; asserts byte-for-byte canonical identity.",
+          "Property test for INV-24: generates Tick arithmetic sequences with random operands in [0, 2^53-1]; asserts no intermediate or final value escapes the safe-integer range using the branded Tick constructor as the guard.",
+          "Tests run under a fixed seed and complete within the §18 performance budget for the affected operations.",
+          "Tests pass lint, compile, and boundary checks."
+        ],
+        "category": "test",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "low",
+        "spec_refs": [
+          "§12 INV-01 — same seed+log+finalTick → identical StateHash byte-for-byte",
+          "§12 INV-22 — two logically equal acyclic supported values → identical canonical bytes",
+          "§12 INV-24 — no Tick arithmetic produces a value outside safe-integer range",
+          "§16 DoD — property tests for invariants required",
+          "§17 CI Gate step 3 — property tests with fixed seed"
+        ],
+        "title": "Add property-based tests for INV-01, INV-22, and INV-24 in @ciclo/core",
+        "why_now": "§16 requires property tests for invariants, and §17 CI Gate requires per-tick StateHash replay of three reference saves. INV-01 (replay determinism), INV-22 (canonical-byte equality), and INV-24 (no safe-integer overflow) are the earliest invariants testable once core types and CanonicalEncoder are stable. Writing these tests now pins the contract before it is consumed by domain and world packages. They also satisfy part of the CI gate before the full replay tooling exists."
+      },
+      {
+        "acceptance_targets": [
+          "Account enum enumerates all accounts from §6 including world:rounding_residue template.",
+          "Entry type: {account, commodity, amount: Money|Quantity, side: DEBIT|CREDIT}; Transaction type: {tick, sequence, kind, causationId, entries: Entry[]} — all immutable (readonly).",
+          "postTransaction validates per-commodity balance (sum of credits == sum of debits) and throws on imbalance; sequence is monotonically increasing within a tick.",
+          "queryBalance(account, commodity, throughTick) returns Money|Quantity by replaying the ledger; O(n) in entries is acceptable at FASE-1.",
+          "Unit tests cover INV-04, INV-05, INV-06 with multi-commodity transactions. Lint, compile, and boundary pass."
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "low",
+        "spec_refs": [
+          "§6 — double-entry mandatory, multi-commodity, per-commodity balance in every Transaction, immutable entries, tick/sequence/kind/causationId on every Transaction",
+          "§4 — Account, Entry, Transaction in locked glossary",
+          "§12 INV-04 — BRL ledger sum zero across all accounts at every tick",
+          "§12 INV-05 — asset quantity sum zero across all accounts at every tick",
+          "§12 INV-06 — every Transaction balances per commodity (debits == credits)",
+          "§3 ADR-004 — rounding residue routed to world:rounding_residue:<COMMODITY>"
+        ],
+        "title": "Implement multi-commodity double-entry ledger foundation in @ciclo/domain",
+        "why_now": "The ledger is a FASE-1 deliverable (§15) and a prerequisite for market orders, the tick loop, and the rounding-residue account (ADR-004). Accounts, Entry, Transaction, and balance-per-commodity queries are enumerated and locked in §6 and §4. The implementation is dependency-ready once numeric types are stable and is entirely within @ciclo/domain with no dependency on world, narrative, or RNG. Doing this now allows the tick loop and market order work to proceed in parallel with price generation."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo infrastructure is complete: lint rules for pure-package determinism, dependency boundary checker, TypeScript project references with strict settings, and test tooling for all three are operational and passing. Zero production code has been committed to any source package after 27 benchmark cycles. TASK-0006 (CanonicalEncoder cycle/accessor handling, ADR-009) is in CREATED status after three review rejections; the most recent review (review-03) identified exactly two remaining MAJOR findings.",
+      "highest_priority_gap": "Two MAJOR findings from TASK-0006 review-03 block CanonicalEncoder acceptance: (1) canonical.ts reads Number.MAX_SAFE_INTEGER and Number.NaN from the live global at call time rather than capturing them at module initialization, violating the no-user-code-execution guarantee of ADR-009; (2) validation evidence supplies no independently captured output for npm run compile or npm run boundary on the corrected candidate. CanonicalEncoder acceptance is a hard prerequisite for StateHash, which gates INV-01, INV-22, and the FASE-1 CI replay gate — no FASE-1 hash-dependent deliverable can proceed without it."
+    },
+    "warnings": [
+      "The DEFINIR for the RNG hash function (ADR-002) is unresolved and no ADR exists in docs/decisions/. Proceeding with RNG implementation requires resolving this DEFINIR via ADR per §19; a provisional decision is permissible only if all fronts are blocked and must be covered by an isolated removable test.",
+      "SPEC_BLOCKERS.md records no open or provisional entries, but TASK-0006 review-03 states a test-count contradiction (157 vs 44 vs 171) was recorded there by a prior implementation candidate. The committed SPEC_BLOCKERS.md is empty, meaning the contradiction is either resolved or was never actually committed; if the contradiction is still live it must be registered per §19 before work proceeds."
+    ]
+  }
+}

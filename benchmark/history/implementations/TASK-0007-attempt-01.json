@@ -1,0 +1,105 @@
+{
+  "attempt": 1,
+  "created_at": "2026-08-14T08:45:22.015409+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 committed specifying the encoding bit-for-bit, including encodingVersion framing, type tags, length framing, UTF-8 key ordering applied recursively, integer and bigint representations, ordered and unordered collection treatment, supported value types, duplicate/collision handling, and all rejection cases.",
+        "evidence": "docs/decisions/0009-canonical-encoder.md sections 1 (envelope with u32-be encodingVersion length), 2 (type tags 0x01-0x0A, INT/BIGINT ASCII+sign, u32-be length prefixes, ARRAY/OBJECT/SET/MAP semantics, DUPLICATE_COLLECTION_ENTRY), 3 (recursive UTF-8 key ordering), 4 (numeric rejections), 5 (unsupported values including symbols, functions, Date, RegExp, Buffer, typed arrays, class instances, cycles), 6 (concatenation-ambiguity discussion), 7 (encodingVersion participation).",
+        "status": "PASS"
+      },
+      {
+        "criterion": "packages/core exports canonicalEncode(state, encodingVersion) returning Uint8Array and CanonicalEncoderError.",
+        "evidence": "packages/core/src/index.ts declares `export class CanonicalEncoderError extends Error` with typed `code`, and `export function canonicalEncode(state: unknown, encodingVersion: string): Uint8Array`. tsc -b passes and the .mjs tests import both names successfully.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Logically equal supported states, including states whose object properties were inserted in different orders, encode to byte-identical output.",
+        "evidence": "Tests 'logically equal states with different object insertion orders produce identical bytes', 'recursive key ordering: nested objects with permuted insertion orders encode identically', 'unordered collections: plain object property insertion order does not affect bytes', 'unordered collection Set with heterogeneous supported types is stable across orders', 'deep recursive equality with mixed collection kinds is byte-stable across insertion orders', and 'numeric-looking object property keys do not reorder to numeric order' all pass under `npm test`.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Each tested logically distinct state encodes differently, including bigint 1n versus number 1, different nesting, different collection kinds, and values that would collide under delimiter-free concatenation.",
+        "evidence": "Tests 'bigint 1n and number 1 have distinct type tags and therefore distinct bytes', 'bigint zero and number zero encode differently', 'bigint negative and number negative of same magnitude encode differently', 'collection kinds are distinguished by tag: array vs plain object vs set vs map', 'different nesting shapes encode differently', 'length framing prevents delimiter-free collision: two 1-char keys vs one 2-char key', 'length framing prevents delimiter-free collision: split string vs concatenated string', 'length framing prevents integer concatenation collision', 'length framing prevents string vs array collision with equivalent contents', 'empty containers encode to distinct minimal shapes', and 'primitive types encode distinctly from one another for the same textual value' all pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Changing encodingVersion changes the encoded bytes for the same state.",
+        "evidence": "Tests 'changing encodingVersion changes the encoded bytes for the same state' and 'changing encodingVersion changes bytes even for a bare primitive' pass; canonicalEncode writes encodingVersion into the envelope header before the root value.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Undefined, NaN, Infinity, -Infinity, negative zero, unsafe integer numbers, cyclic structures, and every value type excluded by ADR-009 throw CanonicalEncoderError.",
+        "evidence": "Tests reject undefined at root/nested/inside-array (UNDEFINED_VALUE), NaN (NAN), positive Infinity (POSITIVE_INFINITY), negative Infinity (NEGATIVE_INFINITY), -0 (NEGATIVE_ZERO), 1.5 (NON_INTEGER_NUMBER), Number.MAX_SAFE_INTEGER+1 (UNSAFE_INTEGER), cyclic array/object/mutual cycle (CYCLE), symbol values (UNSUPPORTED_TYPE), symbol-keyed properties (SYMBOL_KEY), functions (UNSUPPORTED_TYPE), Date (UNSUPPORTED_TYPE), RegExp (UNSUPPORTED_TYPE), Uint8Array (UNSUPPORTED_TYPE), class instances (UNSUPPORTED_TYPE), and duplicate canonical entries in Set/Map (DUPLICATE_COLLECTION_ENTRY). Each expectError case asserts both the CanonicalEncoderError class and the specific code.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Unordered collections encode identically across insertion orders according to ADR-009; ordered collections preserve order and encode differently when order changes.",
+        "evidence": "Ordered: 'ordered collections: arrays with reversed elements produce different bytes' and 'ordered collections: Maps with reversed insertion order produce different bytes' pass. Unordered: 'unordered collections: Sets with permuted insertion orders encode identically', 'unordered collections: plain object property insertion order does not affect bytes', and 'unordered collection Set with heterogeneous supported types is stable across orders' pass. ADR-009 section 2 assigns dedicated tags (0x07 ARRAY, 0x08 OBJECT, 0x09 SET, 0x0A MAP) with the corresponding ordering rules.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No StateHash, SaveHash, RNG, ledger, world, application, or Electron implementation is introduced.",
+        "evidence": "git status shows the only changes are docs/decisions/0009-canonical-encoder.md (ADR), packages/core/src/index.ts (encoder + error), packages/core/package.json (type=module), tests/core/canonical-encoder.test.mjs (unit tests), and package.json (test glob). No files under packages/world, packages/domain, packages/application, packages/adapters, packages/ui, packages/narrative, apps/, or tools/ were touched, and no hash function was added.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository typecheck, lint, existing architecture-boundary checks, and the complete existing test suite pass.",
+        "evidence": "npm run compile succeeds (tsc -b returns 0). npm run lint succeeds with --max-warnings=0. npm run boundary reports 'dependency-boundary: OK. 15 workspace packages validated against §14.5.'. npm test reports 'tests 92 / pass 92 / fail 0 / skipped 0'.",
+        "status": "PASS"
+      }
+    ],
+    "adrs_created_or_updated": [
+      "docs/decisions/0009-canonical-encoder.md"
+    ],
+    "changed_files": [
+      "docs/decisions/0009-canonical-encoder.md",
+      "packages/core/src/index.ts",
+      "packages/core/package.json",
+      "tests/core/canonical-encoder.test.mjs",
+      "package.json"
+    ],
+    "discovered_out_of_scope_issues": [
+      "packages/core did not declare type=module previously; this triggered a Node MODULE_TYPELESS_PACKAGE_JSON warning under --experimental-strip-types when tests loaded the .ts entry point. Fixed as a minimal directly-required adjustment since the tests import from that package; no other package's package.json was touched."
+    ],
+    "invariants_affected": [
+      "INV-22 (encoder is the prerequisite for future byte-equality-of-state; INV-22's own test still requires a StateHash and remains out of scope for this task)"
+    ],
+    "known_issues": [],
+    "notes_for_reviewer": [
+      "ADR-009 specifies the wire format bit-for-bit; any future change to the encoded bytes MUST land as a new ADR AND bump encodingVersion, per CICLO_SPEC.md §16 Definition of Done item 6.",
+      "The encoder deliberately admits null, boolean, safe-integer number, bigint, string, Array, plain object, Set, and Map. It rejects everything else — Date, RegExp, Uint8Array, Buffer, typed arrays, promises, class instances, symbol keys, functions, cycles, and duplicate canonical entries in Set or Map — so callers must model state in this domain from the start.",
+      "Object keys are collected via Object.getOwnPropertyNames plus a getOwnPropertyDescriptor enumerability filter (Object.keys is forbidden by §13 lint), and Object.getOwnPropertySymbols is checked so that symbol-keyed properties raise SYMBOL_KEY rather than being silently dropped.",
+      "Length prefixes are fixed big-endian unsigned 32-bit integers so the encoding does not depend on platform endianness; big-endian is the transport-layer choice, encoded by explicit shifts.",
+      "Tests use Node 22's built-in TypeScript type stripping to import packages/core/src/index.ts directly from .mjs test files; no ts-node or bundler dependency is added.",
+      "Tests live under tests/core/ (mirroring the existing tests/{config,lint,boundary} layout) and the root `test` script glob was extended to include that directory."
+    ],
+    "status": "COMPLETED",
+    "summary": "Landed ADR-009 as a normative bit-for-bit specification of the canonical state encoder and implemented canonicalEncode plus CanonicalEncoderError in packages/core. Framing is: fixed magic 0x43454E43 + 1-byte frame version + big-endian u32-prefixed encodingVersion UTF-8 bytes + tagged root value. Ten single-byte type tags separate null, false, true, safe-integer number (ASCII decimal with explicit sign), bigint (same shape but distinct tag so 1 never collides with 1n), string (u32-be-length + UTF-8), Array (ordered), plain object (unordered, keys sorted lexicographically by UTF-8 bytes recursively), Set (unordered, elements sorted by canonical byte order with duplicate detection), and Map (ordered by insertion order with duplicate-key detection). Every string, bigint payload, and collection carries a u32 big-endian length or count so no two distinct states can collide via concatenation. Rejections use CanonicalEncoderError with typed codes: UNDEFINED_VALUE, NAN, POSITIVE_INFINITY, NEGATIVE_INFINITY, NEGATIVE_ZERO, NON_INTEGER_NUMBER, UNSAFE_INTEGER, CYCLE, SYMBOL_KEY, DUPLICATE_COLLECTION_ENTRY, INVALID_ENCODING_VERSION, LENGTH_OVERFLOW, and UNSUPPORTED_TYPE (Date, RegExp, Uint8Array, class instances, functions, symbols). Cycle detection uses a WeakSet of objects currently on the encoding stack, so shared references (DAGs) are permitted while any true cycle throws. 48 new focused unit tests exercise recursive key-order invariance, ordered vs unordered collection distinctions, version separation, bigint/number tag distinction, length-framing ambiguity cases, every rejection code, and DAG acceptance. Package packages/core now declares type=module to eliminate the type-stripping performance warning. No hash, RNG, ledger, world, application, adapters, or Electron code was introduced.",
+    "task_id": "TASK-0007",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json completes with no errors across all 15 project references."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . completes clean; pure-package rules (§13) are still enforced against the new encoder source."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "tools/boundary/check.mjs reports OK for all 15 workspace packages against the §14.5 direct-edge graph."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "node --test runs 92 tests (44 pre-existing config/lint/boundary + 48 new canonical-encoder tests); 0 failures, 0 skipped."
+      }
+    ]
+  },
+  "task_id": "TASK-0007"
+}
