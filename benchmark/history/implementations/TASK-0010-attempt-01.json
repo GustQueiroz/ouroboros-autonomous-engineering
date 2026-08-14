@@ -1,0 +1,94 @@
+{
+  "attempt": 1,
+  "created_at": "2026-08-14T13:20:54.232236+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "packages/core publicly exports distinct Money, Quantity, Price, Rate, and Tick types; cross-brand assignment fails compile-time type test.",
+        "evidence": "packages/core/src/numeric.type-test.mts declares CrossBrandNegativeAssertions and TickCrossBrandNegativeAssertions covering all 12 pair combinations among the four bigint brands plus all 8 Tick-vs-bigint-brand assertions using Expect<NotAssignable<A,B>>; verified the mechanism catches assignability by temporarily replacing one entry with NotAssignable<Money,Money> which produced tsc error TS2344 as expected.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Money, Quantity, Price, Rate use bigint underlying representation; Tick uses number underlying representation.",
+        "evidence": "numeric.mts declares Money/Quantity/Price/Rate as `bigint & { brand }` and Tick as `number & { brand }`; runtime test QUANTITY_SCALE typeof bigint plus Money(0n) returning bigint and Tick(0) returning number confirm the underlying primitives.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Tick accepts safe integers in [MIN_SAFE_INTEGER, MAX_SAFE_INTEGER] and rejects fractional, NaN, infinities, and out-of-range values.",
+        "evidence": "Tests in tests/core/numeric.test.mjs cover Tick(MIN_SAFE_INTEGER), Tick(MAX_SAFE_INTEGER), Tick(MAX_SAFE_INTEGER+1) throws, Tick(MIN_SAFE_INTEGER-1) throws, Tick(1.5)/Tick(0.1)/Tick(-1.5) throw, Tick(NaN)/Tick(POSITIVE_INFINITY)/Tick(NEGATIVE_INFINITY) throw. Constructor uses Number.isSafeInteger which is exact for this predicate.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Runtime constructors reject wrong primitive types; no runtime detection of erased TypeScript brands required.",
+        "evidence": "Each of Money/Quantity/Price/Rate rejects number, string, null, undefined, boolean, object, and symbol via typeof !== 'bigint' guard; Tick rejects bigint, string, null, undefined, boolean, object via typeof !== 'number' guard; no runtime cross-brand check is performed.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "packages/core exports QUANTITY_SCALE=100000000n, PRICE_SCALE=10000n, RATE_SCALE=100000000n as bigint constants without floating-point conversion.",
+        "evidence": "numeric.mts declares them as direct bigint literals `100_000_000n`, `10_000n`, `100_000_000n`; tests assert typeof bigint and value equality with 100000000n, 10000n, 100000000n.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No production implementation uses Math.random, Date, performance, crypto entropy, floating-point arithmetic, or mutable global state.",
+        "evidence": "numeric.mts uses only bigint literals, Number.isSafeInteger, typeof checks, and template strings; module-scope declarations are all `const` or `export const`; ESLint pure-package rules pass (`npm run lint` exits 0).",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository compile, lint, test, and dependency-boundary commands all exit successfully.",
+        "evidence": "`npm run compile` OK; `npm run lint` OK; `npm run boundary` OK (15 workspace packages validated); `npm test` passes 149/149 (up from 101 pre-change).",
+        "status": "PASS"
+      }
+    ],
+    "adrs_created_or_updated": [],
+    "changed_files": [
+      "packages/core/src/index.mts",
+      "packages/core/src/numeric.mts",
+      "packages/core/src/numeric.type-test.mts",
+      "tests/core/numeric.test.mjs"
+    ],
+    "discovered_out_of_scope_issues": [],
+    "invariants_affected": [
+      "INV-23"
+    ],
+    "known_issues": [],
+    "notes_for_reviewer": [
+      "Branded types use `declare const XxxBrand: unique symbol` phantom keys; the symbols never exist at runtime. This ensures cross-brand assignments are distinguished structurally by TypeScript and cannot be forged from another module.",
+      "The repository did not previously have a TypeScript type-test mechanism. Introduced a minimal one (Expect<T extends true> plus NotAssignable<From,To>) inside packages/core/src/numeric.type-test.mts. The file uses `import type` only so it emits an empty `export {};` module.",
+      "Tick constructor uses a single Number.isSafeInteger check because that predicate is exactly false for fractional, non-finite, and out-of-safe-range values; a separate typeof check precedes it to distinguish wrong-primitive errors (NUMERIC_WRONG_PRIMITIVE) from out-of-range errors (NUMERIC_TICK_OUT_OF_RANGE).",
+      "ADR-001 constrains Tick to non-negative values, but the task explicitly requests the [MIN_SAFE_INTEGER, MAX_SAFE_INTEGER] range matching ADR-003. Implemented per task; higher-layer domain enforcement of non-negativity remains a future concern and is out of scope for TASK-0010.",
+      "`export { Money }` from index.mts re-exports both the type and the value binding since verbatimModuleSyntax is false in the base tsconfig."
+    ],
+    "status": "COMPLETED",
+    "summary": "Added branded numeric primitives to packages/core: distinct bigint-backed Money/Quantity/Price/Rate and number-backed Tick types with runtime constructors that validate the underlying primitive; Tick additionally rejects non-integers, out-of-safe-range values, NaN, and infinities via Number.isSafeInteger. Exposed QUANTITY_SCALE=100000000n, PRICE_SCALE=10000n, RATE_SCALE=100000000n as bigint literals with no floating-point conversion. Established a compile-time type-test mechanism (Expect/NotAssignable) covering all 12 cross-brand pairs among Money/Quantity/Price/Rate, all 8 Tick/bigint-brand cross assertions, and 5 unbranded primitive-to-brand negative assertions. Public API re-exported through packages/core/src/index.mts. No production code uses Math.random, Date, performance, crypto, floating-point arithmetic, or mutable global state.",
+    "task_id": "TASK-0010",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b succeeded with no errors."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . exited 0."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary: OK. 15 workspace packages validated against §14.5."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "149/149 node --test passed (48 new numeric tests added; existing 101 tests unchanged)."
+      },
+      {
+        "command": "tsc -b (with injected `Expect<NotAssignable<Money, Money>>`)",
+        "result": "PASS",
+        "summary": "Confirmed the compile-time type-test mechanism fires: tsc reported TS2344 'Type false does not satisfy the constraint true'; injection was reverted before final validation."
+      }
+    ]
+  },
+  "task_id": "TASK-0010"
+}

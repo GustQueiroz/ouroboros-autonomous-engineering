@@ -1,0 +1,73 @@
+{
+  "created_at": "2026-08-14T13:38:11.635422+00:00",
+  "cycle_id": "CYCLE-000123",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase. Nominal economic types and fixed scales are binding ADR-003 primitives, require no unresolved DEFINIR decision, and are the smallest complete dependency needed by both domain and world work. RNG and rounding work require ADR decisions first; ledger and price generation still depend on missing core primitives.",
+    "risks": [
+      "An overly permissive brand declaration could allow structural or cross-brand assignment; compile-time negative fixtures must detect this.",
+      "Runtime callers can bypass TypeScript types, so constructors or guards must validate unknown inputs without coercion.",
+      "Changing the core export surface can accidentally regress CanonicalEncoder exports."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "packages/core/src/index.mts exports branded TypeScript types Money, Quantity, Price, Rate, and Tick.",
+        "packages/core/src/index.mts exports QUANTITY_SCALE as 100_000_000n, PRICE_SCALE as 10_000n, and RATE_SCALE as 100_000_000n, with bigint literal types preserved where supported by the existing public API conventions.",
+        "At runtime, each Money, Quantity, Price, and Rate constructor or guard rejects non-bigint inputs and accepts bigint inputs without precision conversion.",
+        "At runtime, the Tick constructor or guard accepts 0 and Number.MAX_SAFE_INTEGER and rejects negative values, values above Number.MAX_SAFE_INTEGER, non-integers, NaN, infinities, and non-number inputs.",
+        "Compile-time fixtures demonstrate that raw primitive values and values of a different brand cannot be assigned to any branded type without passing through its corresponding public constructor or guard.",
+        "No packages/core import is introduced, and the repository boundary checker remains green.",
+        "The full existing test suite, strict TypeScript build or typecheck, lint suite, and determinism-lint fixture suite remain green."
+      ],
+      "cycle_id": "CYCLE-000123",
+      "must_preserve": [
+        "CanonicalEncoder behavior and exports.",
+        "ADR-003 prohibition on floating-point representation for Money, Quantity, Price, and Rate.",
+        "INV-23: every Tick remains within the safe non-negative integer range.",
+        "INV-26: packages/core imports nothing.",
+        "Existing strict compiler, lint, boundary, and CI gates."
+      ],
+      "objective": "Implement and export the ADR-003 nominal types, scale constants, and runtime-validated constructors required for FASE-1 domain and world development.",
+      "out_of_scope": [
+        "Positional RNG or ADR-002.",
+        "Division and rounding helpers or ADR-004.",
+        "Ledger, world-price, application, contracts, UI, Electron, packaging, or replay implementation.",
+        "Arithmetic semantics beyond the specified scale constants and input validation.",
+        "Changes to CICLO_SPEC.md or unrelated repository infrastructure."
+      ],
+      "required_adrs": [],
+      "required_tests": [
+        "Unit tests for valid and invalid runtime construction of all five nominal types.",
+        "Tick boundary tests at 0, Number.MAX_SAFE_INTEGER, -1, Number.MAX_SAFE_INTEGER + 1, fractional values, NaN, positive and negative infinity, bigint, string, null, and undefined.",
+        "Compile-time negative tests for cross-brand assignment and direct primitive assignment, plus positive tests for values returned by each constructor or guard.",
+        "Exact-value and bigint-type tests for all three scale constants.",
+        "Run the repository's full test, strict typecheck/build, lint, determinism-lint fixture, and package-boundary validation commands."
+      ],
+      "scope": [
+        "Define branded Money, Quantity, Price, Rate, and Tick types in packages/core.",
+        "Export QUANTITY_SCALE = 100_000_000n, PRICE_SCALE = 10_000n, and RATE_SCALE = 100_000_000n as bigint constants.",
+        "Provide public constructors or guards that accept bigint for Money, Quantity, Price, and Rate and reject every non-bigint runtime value.",
+        "Provide a Tick constructor or guard that accepts only integer numbers in the inclusive range 0 through Number.MAX_SAFE_INTEGER.",
+        "Export the types, constants, and constructors or guards from packages/core/src/index.mts.",
+        "Add runtime and compile-time tests for validation and nominal-brand isolation."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §3 / ADR-003 locked nominal representations and scales",
+        "CICLO_SPEC.md §4 domain glossary",
+        "CICLO_SPEC.md §14.1 TypeScript nominal-type enforcement",
+        "CICLO_SPEC.md §15 FASE-1 acceptance",
+        "CICLO_SPEC.md INV-23 Tick safe-integer bound",
+        "CICLO_SPEC.md INV-26 package boundaries"
+      ],
+      "task_id": "TASK-0011",
+      "title": "Add nominal economic types and fixed scales to core"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0011",
+  "title": "Add nominal economic types and fixed scales to core"
+}

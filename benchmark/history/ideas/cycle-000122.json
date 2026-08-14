@@ -1,0 +1,155 @@
+{
+  "created_at": "2026-08-14T13:33:10.769674+00:00",
+  "cycle_id": "CYCLE-000122",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ specifying the hash function bit-by-bit (at minimum: SplitMix64 over FNV-1a accumulator as spec recommends, or an equally specified alternative)",
+          "packages/core exports `rand(masterSeed: string, namespace: string, ...coords: number[]): number` as a pure positional function",
+          "Calling rand with identical arguments at any point in any order returns the same value",
+          "Namespaces are isolated: rand(seed, 'market.trend', 0, 0) !== rand(seed, 'bot.policy', 0, 0) for the same seed",
+          "INV-12 test green: no generated identifier depends on external entropy",
+          "Lint rule confirming Math.random is still absent from all pure packages"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "TASK-0010 (nominal Tick type needed for coord parameters)"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002",
+          "§12 INV-02",
+          "§12 INV-12",
+          "§13 (Math.random prohibition)",
+          "§15 FASE-1 acceptance",
+          "§19 Lacunas conhecidas (função de hash)"
+        ],
+        "title": "Positional RNG and hash function ADR (ADR-002)",
+        "why_now": "Every piece of deterministic world generation — market prices, bot policies, macro events, NPC tip truth values — depends on `rand(seed, namespace, ...coords)`. The hash function is marked DEFINIR in ADR-002 but must be fully specified bit-by-bit in an ADR before any implementation can exist. Without the RNG, packages/world, packages/domain, and packages/application cannot advance beyond stubs. This is the second most foundational gap after nominal types (TASK-0010 in progress), and it blocks the entire FASE-1 critical path."
+      },
+      {
+        "acceptance_targets": [
+          "ADR documenting how implicit division is technically prohibited (lint rule or TypeScript trick)",
+          "packages/core exports `divInt(dividend: bigint, divisor: bigint, mode: RoundingMode): bigint` and `divSafeInt(dividend: number, divisor: number, mode: RoundingMode): number`",
+          "Property test: for any a and b, `divInt(a,b,TRUNCATE_TOWARD_ZERO) * b + residual === a` with no value lost",
+          "INV-07 infrastructure: rounding residue is always the exact difference, never zero-suppressed",
+          "No raw `/` or `**` on branded economic types passes lint"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "TASK-0010 (branded Money/Quantity/Price/Rate types)"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003",
+          "§3 ADR-004",
+          "§12 INV-07",
+          "§13 (float prohibition, operator prohibition)",
+          "§15 FASE-1 acceptance"
+        ],
+        "title": "Safe integer division helpers with explicit rounding modes (ADR-004)",
+        "why_now": "ADR-003 and ADR-004 forbid the `/` operator and `**` operator on Money, Quantity, Price, and Rate types. Every economic calculation — notional, price conversion, fees, slippage — requires division with an explicitly declared rounding mode. The helper (`divInt(a, b, mode)`) and the three rounding modes (`TRUNCATE_TOWARD_ZERO`, `ROUND_HALF_UP`, `ROUND_HALF_EVEN`) must exist in packages/core before any ledger or pricing code can be written correctly. ADR-004 also marks as DEFINIR how the no-implicit-division rule is technically enforced (lint or type system): that decision must be documented before any economic code ships."
+      },
+      {
+        "acceptance_targets": [
+          "ADR documenting octave count, periods, amplitudes, and their hash-of-compatibility commitment",
+          "packages/world exports `worldPrice(masterSeed: string, assetId: AssetId, tick: Tick): Price`",
+          "At minimum ORB and NEXA assets supported with archetype parameters",
+          "Two noise octave layers (trendLayer and idiosyncraticNoise) implemented in fixed-point without Math.sin/exp/pow",
+          "INV-02 green: worldPrice(seed, asset, 9_000_000) === result of advancing tick-by-tick to 9_000_000",
+          "INV-03 green: worldPrice series is identical across two runs with different player action logs on same seed",
+          "Performance: worldPrice call within 2µs budget (per §18)"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001 (positional RNG)",
+          "IDEA-002 (division helpers)",
+          "TASK-0010 (Price, Tick nominal types)"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 (price construction formula)",
+          "§3 ADR-002 (positional rand)",
+          "§3 ADR-003 (no floats)",
+          "§3 ADR-005 (no OHLC at base level)",
+          "§12 INV-02",
+          "§12 INV-03",
+          "§15 FASE-1 acceptance (gerador de preço com duas camadas de ruído e dois ativos)",
+          "§19 Lacunas conhecidas (número de oitavas e parâmetros do gerador — DEFINIR, requires ADR)"
+        ],
+        "title": "Market price generator — packages/world foundation",
+        "why_now": "FASE-1 acceptance explicitly requires a price generator with two noise octave layers and two assets. This is the first substantive piece of packages/world. INV-02 (direct query equals tick-by-tick traversal) and INV-03 (player actions do not alter world price) both anchor here. The generator uses only rand(), fixed-point arithmetic, and nominal types — all of which will be available once IDEA-001 and IDEA-002 land. Delaying this further pushes all downstream FASE-1 work (ledger, tick loop, replay tool, performance baseline) back proportionally."
+      },
+      {
+        "acceptance_targets": [
+          "packages/domain exports Transaction, Entry, Account, Fill, Position types with no float",
+          "All minimum accounts from §6 implemented (player:cash:BRL, world:counterparty_cash, world:asset_supply, world:rounding_residue, venue:fees, etc.)",
+          "Market buy and sell spot orders execute via Transaction, producing correct multi-commodity entries",
+          "INV-04 green: every Transaction balances per commodity, with sum exactly zero",
+          "INV-05 green: sum of all BRL account balances is zero in every tick",
+          "INV-06 green: sum of all asset quantities across accounts is zero in every tick",
+          "INV-07 green: rounding residue account explains every truncated centavo",
+          "Property test: 1000 random order sequences preserve INV-05 and INV-06"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "TASK-0010 (Money, Quantity, Price nominal types)",
+          "IDEA-002 (division with rounding modes)"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 (ledger, accounts, transactions)",
+          "§7 (canonical tick order, steps 5 and 6)",
+          "§12 INV-04",
+          "§12 INV-05",
+          "§12 INV-06",
+          "§12 INV-07",
+          "§12 INV-08",
+          "§15 FASE-1 acceptance (ledger multi-commodity, ordem a mercado)"
+        ],
+        "title": "Double-entry ledger and spot market order execution — packages/domain",
+        "why_now": "FASE-1 acceptance requires a multi-commodity double-entry ledger and market buy/sell spot orders. INV-04 through INV-07 all require the ledger to exist. Without it there is no game loop, no save with meaningful state, no replay to test, and no performance baseline to freeze. The domain package depends only on packages/core (types and arithmetic helpers), making it parallelizable with packages/world once TASK-0010 and IDEA-002 are done."
+      },
+      {
+        "acceptance_targets": [
+          "Electron, React, and electron-builder added to the workspace with pinned versions documented",
+          "apps/desktop/main, preload, renderer, simulation-worker wired with correct security settings (contextIsolation true, nodeIntegration false, sandbox true)",
+          "INV-29 test green: automated audit confirms security config is active in all modes including development",
+          "CI produces a functional .exe installer for Windows and a .deb or .AppImage for Linux on every build",
+          "Installed app opens a window displaying the mandatory permanent disclaimer (§20)",
+          "Content Security Policy header set with no unsafe-eval and no remote loading"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.1 (Electron, electron-builder)",
+          "§14.2 (contextIsolation, nodeIntegration: false, sandbox: true, preload allowlist)",
+          "§14.6 (Windows and Linux installers from CI, FASE-1 sequencing requirement)",
+          "§12 INV-29 (Electron security config)",
+          "§15 FASE-1 acceptance (instalador mínimo, interface mínima)"
+        ],
+        "title": "Minimal Electron app and CI installer for Windows and Linux",
+        "why_now": "The spec marks installer sequencing as TRAVADO: 'o instalador existe na FASE-1, em forma mínima' and 'Instalador que abre uma janela vazia na FASE-1 vale mais que instalador perfeito na FASE-7.' FASE-1 acceptance explicitly requires a functional installer produced by CI on both platforms. This work is independent of the market simulation critical path and can proceed in parallel. Deferring it risks discovering ABI, module-native, or packaging problems late when there is no time to correct them architecturally — exactly the failure mode the spec anticipates."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Infrastructure is complete: CI pipeline, dependency-boundary enforcement, pure-package determinism lint rules, strict TypeScript monorepo config, and the CanonicalEncoder (ADR-009, fully implemented and tested in packages/core). All other packages — world, domain, application, narrative, adapters, ui, and all four desktop sub-apps — are empty stubs. No nominal types, no positional RNG, no hash function ADR, no ledger, no market simulation, no Electron shell, no installer. One ADR exists (ADR-009). The benchmark cycle reports that nominal type definitions (TASK-0010) are the current active task.",
+      "highest_priority_gap": "Positional RNG (ADR-002) with a written hash-function ADR is the most blocking gap: it is a prerequisite for the entire packages/world layer, which is itself a prerequisite for the tick loop, the replay tool, the performance baseline, and every INV-02/INV-03 test required by FASE-1 acceptance."
+    },
+    "warnings": []
+  }
+}
