@@ -1,0 +1,72 @@
+{
+  "created_at": "2026-08-14T09:16:43.137175+00:00",
+  "cycle_id": "CYCLE-000082",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase. The rejected CanonicalEncoder work has a concrete injectivity defect affecting INV-22 and blocks all state/save hashing. The next change should address only the two outstanding review findings; arithmetic, RNG, price generation, and unrelated refactoring must wait.",
+    "risks": [
+      "Checking only Object.keys(), Object.entries(), or equivalent enumerable-key APIs would leave the defect unresolved.",
+      "Descriptor inspection must not read property values or invoke getters before rejecting an unsupported object.",
+      "Broad encoder refactoring could change the canonical byte ABI and expand review scope."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "For every admitted plain object, the encoder examines all own property descriptors rather than only enumerable keys.",
+        "A plain object with any non-enumerable own string-keyed data property causes CanonicalEncoderError.",
+        "A plain object with any non-enumerable own string-keyed accessor property causes CanonicalEncoderError without invoking the accessor.",
+        "ADR-009 explicitly states that non-enumerable own properties are unsupported and identifies CanonicalEncoderError as the required outcome.",
+        "Existing canonical bytes and ordering for supported values remain unchanged.",
+        "The submitted verification evidence includes the exact npm run compile command output and exit code 0.",
+        "All repository lint, architecture-boundary, compile, and test gates exit successfully."
+      ],
+      "cycle_id": "CYCLE-000082",
+      "must_preserve": [
+        "INV-22 injectivity for all admitted canonical values.",
+        "Deterministic object-key ordering and byte output for supported plain objects.",
+        "Existing rejection behavior for unsupported types, accessors, symbols, cycles, and invalid object shapes as defined by ADR-009.",
+        "Package-boundary and forbidden-API lint invariants.",
+        "No state or save hash may be introduced before the corrected encoder and ADR are accepted."
+      ],
+      "objective": "Make the canonical encoder reject every non-enumerable own property on admitted plain objects and align ADR-009 and verification evidence with that behavior.",
+      "out_of_scope": [
+        "Canonical encoding refactors unrelated to property enumerability.",
+        "New supported value types or changes to canonical byte formats for already-supported values.",
+        "StateHash, SaveHash, hash-function selection, positional RNG, arithmetic types, price generation, UI, Electron, or packaging work.",
+        "Resolution of ADRs other than the narrowly required ADR-009 correction."
+      ],
+      "required_adrs": [
+        "Amend ADR-009 to make rejection of non-enumerable own properties an explicit supported-types boundary."
+      ],
+      "required_tests": [
+        "Add or update a unit test asserting rejection of a non-enumerable own data property.",
+        "Replace the formerly accepting non-enumerable-accessor test with one asserting CanonicalEncoderError and zero getter invocation.",
+        "Run the complete existing test suite.",
+        "Run the lint and architecture-boundary checks.",
+        "Run npm run compile and capture stdout, stderr, and exit code."
+      ],
+      "scope": [
+        "Amend ADR-009's supported-types contract to state that a plain object containing any non-enumerable own property is unsupported and causes CanonicalEncoderError.",
+        "Update plain-object validation to inspect all own property descriptors, including properties omitted by ordinary enumerable-key iteration, before encoding.",
+        "Throw CanonicalEncoderError when any own property descriptor is non-enumerable.",
+        "Replace any test that accepts or silently ignores a non-enumerable accessor or data property with explicit rejection coverage.",
+        "Run the repository compile command and retain its stdout, stderr, and exit code in the task submission evidence."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §15 FASE-1 acceptance: ADR-009 and canonical encoder before state hashing",
+        "CICLO_SPEC.md §16 items 1-5",
+        "CICLO_SPEC.md §17 CI gate item 1",
+        "ADR-009",
+        "INV-22"
+      ],
+      "task_id": "TASK-0008",
+      "title": "Close CanonicalEncoder non-enumerable-property defect"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0008",
+  "title": "Close CanonicalEncoder non-enumerable-property defect"
+}

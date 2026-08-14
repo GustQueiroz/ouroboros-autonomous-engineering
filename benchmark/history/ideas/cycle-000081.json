@@ -1,0 +1,174 @@
+{
+  "created_at": "2026-08-14T09:09:27.732104+00:00",
+  "cycle_id": "CYCLE-000081",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate implemented as bigint-backed branded types with nominal constructors that reject non-bigint values",
+          "Tick implemented as safe-integer-backed branded type with constructor that rejects non-integer and values outside [-(2^53-1), 2^53-1]",
+          "QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE constants defined as bigint literals",
+          "divTruncate, divHalfUp, divHalfEven helpers accept explicit mode parameter; calling division without mode is a TypeScript type error",
+          "No float literals, no Math.sin/cos/exp/log/pow, no Date, no Math.random anywhere in packages/core",
+          "Property test verifying no safe-integer overflow across ten-year tick range (INV-23 green)",
+          "ADR written in docs/decisions/ specifying the technical mechanism for making undeclared division a compile-time error (resolving ADR-004 DEFINIR item)",
+          "Lint gate remains green after merge"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "INV-23",
+          "Section 14.1",
+          "Section 12",
+          "Section 14.5"
+        ],
+        "title": "Implement branded nominal types and rounding helpers in packages/core",
+        "why_now": "All economic computation in FASE-1 depends on Money, Quantity, Price, Rate, and Tick. These types are independent of the pending CanonicalEncoder and can be developed now. ADR-004's DEFINIR item for the technical enforcement of rounding mode must be written as part of this work — without it, division helpers cannot be correctly specified or implemented, and neither the ledger nor the price generator can begin."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written in docs/decisions/ specifying FNV-1a accumulation of arguments and SplitMix64 output mixing, with exact bit operations documented",
+          "rand(masterSeed, namespace, ...coordinates) implemented as pure function returning a safe integer (uint64 value within 2^53-1)",
+          "All reserved namespaces from ADR-002 table are typed constants, not strings",
+          "Test: rand with identical arguments always returns identical value on the same and on subsequent calls",
+          "Test corresponding to INV-02: price(asset, t) computed directly equals price arrived at by advancing tick by tick",
+          "Test corresponding to INV-03: two calls with different action histories produce identical rand outputs for same coordinates",
+          "No Math.random, Date, performance.now, crypto, or stateful PRNG anywhere in the implementation",
+          "Lint gate and boundary gate remain green"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-03",
+          "INV-12",
+          "Section 5.1",
+          "Section 13"
+        ],
+        "title": "Write hash function ADR and implement positional RNG rand() in packages/core",
+        "why_now": "ADR-002 declares the hash function used in rand(masterSeed, namespace, ...coordinates) as a DEFINIR item that must be specified bit-by-bit in an ADR before implementation. This RNG is the single primitive that all world generation — price layers, macro events, bot policies — depends on. Without it the entire packages/world package cannot begin. The spec recommends SplitMix64 over an FNV-1a accumulator as a starting point."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction type: atomic set of Entry values where per-commodity sum is exactly zero (enforced at construction, not runtime check)",
+          "Entry type: each entry carries commodity, account, signed amount; no entry without explicit commodity is a type error",
+          "Minimum account set implemented: world:issuance, world:counterparty_cash, world:asset_supply:ASSET, world:rounding_residue:COMMODITY, world:insurance_fund, player:cash:BRL, player:spot:ASSET, venue:fees",
+          "Every Transaction carries tick, sequence, kind, causationId; orphan Transaction is a type error",
+          "Rounding residue is captured in world:rounding_residue account, never discarded",
+          "Property test: INV-04 green — per-commodity balance of every Transaction is exactly zero",
+          "Property test: INV-05 green — sum of all BRL accounts is exactly zero at every tick in 1000-transaction sample",
+          "Property test: INV-06 green — sum of asset quantities across all accounts is exactly zero",
+          "No floating point, no Math.random, no Date, no console in packages/domain",
+          "Lint and boundary gates remain green"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "Section 6",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "ADR-003",
+          "ADR-004",
+          "Section 14.5 (domain -> core only)"
+        ],
+        "title": "Implement multi-commodity double-entry ledger in packages/domain",
+        "why_now": "The ledger is explicitly in the FASE-1 scope and is required for INV-04, INV-05, INV-06, and INV-07. It depends only on the branded arithmetic types (IDEA-001) and is fully independent of the CanonicalEncoder and the RNG. Implementing it in parallel with the world stack gives the application layer something to compose against and prevents domain logic from being blocked on world completion."
+      },
+      {
+        "acceptance_targets": [
+          "logPrice computed in fixed-point integer arithmetic without any floating-point intermediate (no Math.sin, Math.exp, Math.pow, Math.log)",
+          "trendLayer and idiosyncraticNoise implemented as block-sampled per-octave values with linear interpolation in fixed-point",
+          "Two assets implemented: ORB (blue chip archetype) and one additional asset with different volatility base",
+          "price(assetId, tick) is a pure function with no mutable state",
+          "INV-02 test: price at arbitrary tick equals price reached by advancing tick-by-tick, verified for at least 100 random (asset, tick) pairs",
+          "INV-03 test: identical world prices for same seed regardless of action log contents",
+          "ADR resolving the number of octaves, periods, and amplitudes written in docs/decisions/",
+          "Performance benchmark shows price(asset, tick) within 2µs budget on reference hardware",
+          "Lint and boundary gates remain green; packages/world imports only packages/core"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-004",
+        "risk": "high",
+        "spec_refs": [
+          "Section 5.1",
+          "ADR-002",
+          "ADR-003",
+          "ADR-005",
+          "INV-02",
+          "INV-03",
+          "Section 15 FASE-1 scope",
+          "Section 18 (price budget: 2µs)"
+        ],
+        "title": "Implement world price generator with two octave layers and two assets in packages/world",
+        "why_now": "FASE-1 explicitly requires the price generator with two layers of noise and two assets. Without it INV-02 cannot be green, the replay CLI cannot produce comparable StateHash values, and the minimal UI has nothing to display. This is the innermost world primitive and blocks both the tick loop and the performance baseline."
+      },
+      {
+        "acceptance_targets": [
+          "Save envelope type implemented with specVersion, rulesetVersion, encodingVersion, masterSeed, finalTick, actions, optional checkpoint",
+          "Load validation: finalTick >= max(actions[].tick) enforced; duplicate (tick, sequence) pairs rejected",
+          "Market order type: buy and sell spot, sequence-monotonic within a tick",
+          "Canonical tick order implemented in a single function with 10 named steps matching Section 7",
+          "INV-21 test: save invariant verified on round-trip of generated saves",
+          "INV-01 baseline: replay of a reference save produces same StateHash at every tick (requires CanonicalEncoder to be accepted first)",
+          "Simulation running in dedicated worker; renderer communicates via typed contract messages from packages/contracts",
+          "tools/replay CLI compares two executions and reports first divergent tick",
+          "Lint, boundary, and compile gates remain green"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-003",
+          "IDEA-004"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "Section 7",
+          "ADR-006",
+          "ADR-009",
+          "INV-01",
+          "INV-21",
+          "Section 15 FASE-1 scope",
+          "Section 14.2 (worker isolation)"
+        ],
+        "title": "Implement save envelope, market order execution, and canonical tick loop",
+        "why_now": "The remaining FASE-1 acceptance criteria — market buy/sell spot, the 10-step canonical tick order, the save format (ADR-006), and INV-21 — all depend on having the ledger and price generator in place. This proposal completes the minimal vertical slice that lets the CLI replay tool and the minimal Electron UI become testable end-to-end, which is the final gate for FASE-1 acceptance."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Bootstrap infrastructure accepted: monorepo with npm workspaces, TypeScript strict config, boundary checker, ESLint purity rules, CI pipeline, and 44 passing gate tests. All 8 packages and 4 app sub-packages contain only empty stubs (export {}). CanonicalEncoder (ADR-009, TASK-0007 attempt-01) submitted for review but not yet accepted or committed. No ADRs written in docs/decisions/. Zero domain logic, zero economic types, zero simulation code, zero Electron code, zero installer.",
+      "highest_priority_gap": "All FASE-1 domain scope is unimplemented: no branded arithmetic types, no positional RNG, no price generator, no ledger, no order execution, no tick loop, no save/replay, no worker communication, no installer, no UI. The CanonicalEncoder has been rejected six or more times; if TASK-0007 also fails, nothing downstream of state hashing can proceed. Simultaneously, no DEFINIR items have been resolved by ADR, blocking both the hash function for rand() and the technical enforcement of rounding mode declaration."
+    },
+    "warnings": [
+      "CanonicalEncoder (ADR-009) has been rejected across TASK-0003, TASK-0004, TASK-0005, TASK-0006, and TASK-0007 for distinct but related issues: user-code execution during traversal, mutable globals, Proxy interception vulnerabilities, and late-bound reads of Number.MAX_SAFE_INTEGER. If TASK-0007 attempt-01 is also rejected, the team must first produce a root-cause analysis of the rejection pattern before submitting another attempt, rather than making incremental patches that leave structural vulnerabilities intact.",
+      "No ADRs exist in docs/decisions/ for any DEFINIR item. At minimum, three DEFINIR items must be resolved by ADR before their dependent components can be implemented: the hash function for rand() (ADR-002), the technical enforcement mechanism for rounding mode declaration (ADR-004), and the octave/period/amplitude parameters of the price generator (Section 5.1). Implementing any of these without a prior ADR violates the Definition of Done (Section 16 item 7).",
+      "At cycle 81 of a 30-day benchmark (approximately 10 days elapsed at 20-minute cadence), FASE-1 remains entirely unimplemented beyond infrastructure. The pace of accepted implementation tasks is one (TASK-0002, infrastructure bootstrap). The remaining FASE-1 scope is substantial: core types, RNG, price generator, ledger, order execution, tick loop, save/replay, worker isolation, installer, and minimal UI. The benchmark risks not completing FASE-1 within the available window if the CanonicalEncoder blocker and the ADR backlog are not resolved in the next few cycles."
+    ]
+  }
+}

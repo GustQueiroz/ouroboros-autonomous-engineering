@@ -1,0 +1,145 @@
+{
+  "created_at": "2026-08-14T09:15:45.006807+00:00",
+  "cycle_id": "CYCLE-000082",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR-009 §supported-types section explicitly states non-enumerable own properties are unsupported and cause CanonicalEncoderError",
+          "canonicalEncode throws CanonicalEncoderError when any enumerated plain-object key has a non-enumerable descriptor in Object.getOwnPropertyDescriptor",
+          "Test that formerly accepted non-enumerable accessors is replaced by a rejection test",
+          "Captured output of npm run compile with exit code 0 is included in submission",
+          "All existing lint, boundary, and test suite gates remain green"
+        ],
+        "category": "bug",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-009",
+          "INV-22",
+          "§15 FASE-1 aceite: ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir",
+          "§16 item 1-5",
+          "§17 Gate de CI item 1"
+        ],
+        "title": "Fix CanonicalEncoder: reject non-enumerable properties and verify compile",
+        "why_now": "TASK-0007 has been rejected three times. The two MAJOR findings from review-03 are precise and mechanical: ADR-009 must explicitly define non-enumerable own properties as unsupported and the encoder must throw CanonicalEncoderError on encountering any, and npm run compile must be executed and its captured stdout/stderr output included in the submission. No other work in FASE-1 can begin until this is accepted — it gates StateHash, SaveHash, and all downstream hash use."
+      },
+      {
+        "acceptance_targets": [
+          "Branded bigint types Money, Quantity, Price, Rate exported from packages/core with constructors that reject non-bigint, out-of-range, and non-integer inputs",
+          "Branded number type Tick with constructor rejecting non-integer and values outside safe integer range",
+          "Division helper(s) requiring explicit rounding mode enum (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN); calling without mode is a compile-time error",
+          "Constants QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE exported as bigint literals",
+          "Property test: no overflow of 2^53 for Tick over 10-year replay (INV-23)",
+          "npm run compile and all existing gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "§4 Glossário travado",
+          "§15 FASE-1: core completo. Aritmética inteira",
+          "INV-23"
+        ],
+        "title": "Implement core branded arithmetic types: Money, Quantity, Price, Rate, Tick",
+        "why_now": "FASE-1 requires 'core completo. Aritmética inteira' as its first listed scope item. These types are prerequisites for every downstream package: domain (ledger, orders), world (price generator), and application (tick loop). ADR-003 defines their representations precisely (bigint for Money/Quantity/Price/Rate, safe-integer number for Tick). No existing code blocks this work — it is independent of the encoder."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/NNNN-hash-function.md committed specifying the hash bit-by-bit with no dependency on native language hash",
+          "ADR names the chosen algorithm (e.g. SplitMix64 over FNV-1a accumulator or equivalent), specifies each arithmetic step, bit width, and mixing constant",
+          "ADR explains how masterSeed, namespace string, and variadic coordinate arguments are combined before hashing",
+          "ADR confirms output is a uint64-equivalent bigint or pair of safe integers as applicable",
+          "No implementation code introduced in this task"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "§19 lacunas conhecidas: função de hash",
+          "§15 FASE-1: rng posicional"
+        ],
+        "title": "Write ADR for hash function (DEFINIR: ADR-002)",
+        "why_now": "ADR-002 is TRAVADA and requires the hash function to be 'especificada bit a bit em ADR, e não pode ser a função de hash nativa'. This is an explicit DEFINIR item listed in §19 lacunas conhecidas. Without the ADR, rand(masterSeed, namespace, ...coordinates) cannot be implemented correctly, which blocks the positional RNG and in turn the entire world simulation. The ADR must be written before the implementation so reviewers can verify correctness bit-by-bit."
+      },
+      {
+        "acceptance_targets": [
+          "packages/core exports rand(masterSeed: string, namespace: string, ...coordinates: number[]): bigint returning a uint64-range value",
+          "Pure function: identical inputs always produce identical output with no mutable state",
+          "Namespaces are isolated: rand(s, 'market.trend', 0, 0) !== rand(s, 'market.factor', 0, 0) for any s",
+          "Test: rand at coordinate (9000000) equals result of iterating coordinates 0..9000000 one by one (INV-02 analog)",
+          "No Math.random(), no PRNG with state, no native crypto hash (ADR-002)",
+          "Implementation matches the hash algorithm defined in the hash-function ADR bit-for-bit"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-03",
+          "INV-12",
+          "§5.1 Construção do preço",
+          "§15 FASE-1: rng posicional"
+        ],
+        "title": "Implement positional RNG: rand(masterSeed, namespace, ...coordinates)",
+        "why_now": "INV-02 ('consultar price(asset, t) diretamente é igual a chegar em t avançando tick por tick') is described as the most important test in the project and it depends entirely on the positional RNG. Every namespace used in world simulation (market.trend, market.factor, market.regime, macro.schedule, bot.policy, etc.) derives from rand(). FASE-1 requires the price generator with two noise layers, which requires rand(). This task should be sequenced immediately after the hash function ADR is accepted."
+      },
+      {
+        "acceptance_targets": [
+          "packages/world exports worldPrice(masterSeed: string, assetId: AssetId, tick: Tick): Price using trendLayer and idiosyncraticNoise octave layers",
+          "Supports at least two assets (ORB and NEXA as specified in §4)",
+          "price(asset, t) direct call equals advancing tick-by-tick for any t and both assets (INV-02)",
+          "Player actions do not alter worldPrice: two calls with identical args return identical Price regardless of any external state (INV-03)",
+          "No floating-point arithmetic; all intermediate calculations use bigint or safe integer (ADR-003)",
+          "No Math.sin, Math.cos, Math.exp, Math.log, Math.pow (§13 lint rules); noise interpolation uses fixed-point linear interpolation",
+          "Octave count, periods, and amplitudes committed to a versioned configuration file (§5.1 DEFINIR note)",
+          "ADR registered for octave parameters before implementation merges"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002",
+          "IDEA-004"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 Construção do preço",
+          "ADR-002",
+          "ADR-003",
+          "ADR-005",
+          "§15 FASE-1: Gerador de preço com duas camadas de ruído e dois ativos",
+          "INV-02",
+          "INV-03"
+        ],
+        "title": "Implement two-asset, two-octave price generator in packages/world",
+        "why_now": "FASE-1 scope explicitly requires 'Gerador de preço com duas camadas de ruído e dois ativos'. This is the minimum world simulation needed to drive the tick loop, the ledger, and the minimal UI (chart, balance). It depends on core arithmetic types (IDEA-002) and the positional RNG (IDEA-004). Once core is complete, this is the next architectural blocker on the critical path to a testable end-to-end loop."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold only: 8 package stubs (all src/index.ts export {}), 4 desktop sub-app stubs, 3 tool stubs, CI pipeline, lint rules, boundary checker, and test fixtures are committed. Zero ADR documents exist in docs/decisions/. Zero production code exists in any package. The only accepted task (TASK-0002) delivered the scaffold itself. TASK-0007 (ADR-009 + CanonicalEncoder) has been rejected three consecutive times.",
+      "highest_priority_gap": "The CanonicalEncoder (TASK-0007) has been rejected three times. The two remaining MAJOR findings are: (1) non-enumerable own properties on plain objects are silently discarded instead of rejected, allowing distinct admitted states to share bytes and breaking the injectivity claim of ADR-009 and INV-22; (2) npm run compile was not executed and its exit code not independently captured. Until these are resolved and the encoder is committed, no StateHash, SaveHash, or any hash-dependent work can begin."
+    },
+    "warnings": [
+      "TASK-0007 process risk: the encoder has been rejected three consecutive times. The fourth attempt must be narrowly scoped to exactly the two MAJOR findings from review-03 (non-enumerable property rejection and captured compile output) without introducing new surface area or refactoring unrelated encoding logic.",
+      "Zero ADR documents exist in docs/decisions/ despite the spec requiring several DEFINIR items to be resolved by ADR before implementation. The hash function ADR (ADR-002 DEFINIR) and the octave-parameter configuration (§5.1 DEFINIR) are prerequisites for implementing rand() and the price generator respectively. Implementing these without prior ADRs will reproduce the same review-cycle pattern seen in TASK-0007.",
+      "The spec states at §14.6: 'o instalador existe na FASE-1, em forma mínima'. No Electron, preload, renderer, or packaging work has been started. While core arithmetic and the encoder are higher priority now, the installer requirement must not be deferred to the end of FASE-1 or it risks the same last-week ABI/packaging failures the spec explicitly warns against."
+    ]
+  }
+}
