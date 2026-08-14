@@ -1,0 +1,84 @@
+{
+  "created_at": "2026-08-14T00:42:37.248624+00:00",
+  "cycle_id": "CYCLE-000024",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase, and the repository lacks its prerequisite monorepo, build, test, lint, and dependency-boundary foundation. The prior pnpm-based bootstrap repeatedly failed in the authoritative environment, so the highest-value legal unit is a clean npm-workspaces bootstrap. ADR-dependent algorithms and later FASE-1 domain features remain premature.",
+    "risks": [
+      "A workspace or TypeScript-project count inferred from directory layout may diverge if non-TypeScript mandated workspaces are handled inconsistently; tests must enumerate explicit expected paths rather than merely assert a count.",
+      "Boundary resolution can accidentally miss relative imports or authorize transitive dependencies; dedicated negative fixtures are required.",
+      "Dependency installation may still fail if the committed lockfile is not generated with the npm version used by the authoritative environment.",
+      "An empty blocker registry must not be interpreted as resolution of already identified specification ambiguities; those affected implementation fronts remain out of scope and blocked."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "The root package.json declares npm workspaces for all 16 mandated directories, and each directory exists with valid workspace metadata.",
+        "A committed package-lock.json is present, and npm ci succeeds from a clean checkout in the authoritative validation environment.",
+        "No pnpm-workspace.yaml, pnpm-lock.yaml, pnpm shim, pnpm packageManager declaration, or pnpm invocation exists in repository-controlled configuration, scripts, source, or CI.",
+        "The exact root commands npm run compile, npm run lint, npm run boundary, and npm run test each exit 0 after npm ci.",
+        "Every TypeScript workspace configuration extends the shared base configuration, and the effective configuration enables strict and noUncheckedIndexedAccess.",
+        "TypeScript source discovery and relevant gates cover .ts, .tsx, .mts, and .cts files.",
+        "The pure-package lint restrictions apply to all four TypeScript extensions under packages/; any exception is confined to packages/adapters or packages/ui as allowed by the specification.",
+        "The boundary checker rejects forbidden direct cross-workspace imports, including relative cross-workspace imports, while permitting only direct edges declared by §14.5 and not treating transitive reachability as permission.",
+        "CI uses npm ci and runs compile, lint, boundary, and test successfully against committed state.",
+        "SPEC_BLOCKERS.md exists with the fields required by §19 and does not record a fabricated resolution.",
+        "No production algorithm, economic behavior, or behavior dependent on an unresolved DEFINIR item is introduced."
+      ],
+      "cycle_id": "CYCLE-000024",
+      "must_preserve": [
+        "The authority and contents of CICLO_SPEC.md and BENCHMARK.md.",
+        "All existing benchmark history, checkpoints, and accepted repository state.",
+        "Direct-edge semantics of the §14.5 dependency graph.",
+        "The prohibition on silently resolving contradictions or DEFINIR items.",
+        "Deterministic, strict, and noUncheckedIndexedAccess TypeScript foundations.",
+        "Zero production domain or economic behavior during bootstrap."
+      ],
+      "objective": "Establish an installable, deterministic TypeScript monorepo foundation whose compile, lint, boundary, and test gates pass using npm only.",
+      "out_of_scope": [
+        "pnpm configuration, lockfiles, shims, commands, or package-manager fallback behavior.",
+        "Production algorithms, economic rules, simulation behavior, persistence formats, RNG, canonical encoding, or state hashing.",
+        "ADRs resolving DEFINIR items, including ADR-002, ADR-004, and ADR-009.",
+        "Implementation of packages/world, packages/domain, packages/application, replay behavior, or benchmarks.",
+        "Resolution of the transcendental-function contradiction, octave parameters, or tools dependency-edge ambiguity.",
+        "Dependency rules for tools/* that are not explicitly defined by §14.5."
+      ],
+      "required_adrs": [],
+      "required_tests": [
+        "A configuration test enumerates every mandated TypeScript project and verifies inheritance of strict and noUncheckedIndexedAccess plus coverage of .ts, .tsx, .mts, and .cts.",
+        "Negative lint fixtures using .mts and .cts demonstrate that prohibited pure-package constructs fail the real lint gate.",
+        "Boundary tests demonstrate rejection of a forbidden direct edge, rejection of an attempted edge justified only by transitive reachability, and rejection of a relative import crossing into a disallowed workspace.",
+        "A positive boundary test demonstrates acceptance of at least one explicitly allowed direct edge.",
+        "Clean-install validation runs npm ci followed by npm run compile, npm run lint, npm run boundary, and npm run test."
+      ],
+      "scope": [
+        "Configure the repository root as an npm workspaces monorepo with a committed package-lock.json and the 16 directories mandated by §14.4 registered as workspaces.",
+        "Add root npm scripts named compile, lint, boundary, and test, with no pnpm dependency or invocation.",
+        "Create the shared strict TypeScript configuration and minimal per-project configurations for every mandated TypeScript workspace, covering .ts, .tsx, .mts, and .cts sources.",
+        "Implement lint configuration enforcing §13 pure-package restrictions across all four TypeScript extensions, with exceptions limited to the specification-authorized adapters and UI locations.",
+        "Implement a dependency-boundary checker that validates direct imports against the directed graph in §14.5, including relative imports that cross workspace boundaries.",
+        "Add CI configuration that installs with npm ci and runs the four required root gates.",
+        "Create SPEC_BLOCKERS.md in the §19 registry format without inventing, resolving, or implementing any specification decision.",
+        "Add only minimal non-domain placeholder sources needed to make the workspace and gates executable."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §13 — Proibições verificáveis por lint",
+        "CICLO_SPEC.md §14.1 — Stack",
+        "CICLO_SPEC.md §14.4 — Estrutura",
+        "CICLO_SPEC.md §14.5 — Arquitetura verificável",
+        "CICLO_SPEC.md §15 — FASE-1 acceptance criteria",
+        "CICLO_SPEC.md §17 — Gate de CI",
+        "CICLO_SPEC.md §19 — Protocolo de ambiguidade",
+        "INV-26"
+      ],
+      "task_id": "TASK-0002",
+      "title": "Bootstrap the FASE-1 monorepo with npm workspaces and architecture gates"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0002",
+  "title": "Bootstrap the FASE-1 monorepo with npm workspaces and architecture gates"
+}

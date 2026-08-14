@@ -1,0 +1,172 @@
+{
+  "created_at": "2026-08-14T00:41:31.249768+00:00",
+  "cycle_id": "CYCLE-000024",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Root package.json uses npm workspaces field; no pnpm-workspace.yaml, no pnpm-lock.yaml, no pnpm shim; npm ci succeeds from committed package-lock.json in the authoritative validation environment",
+          "All 16 mandated workspace packages and apps exist and are registered; root commands are npm run compile, npm run lint, npm run boundary, npm run test — no pnpm invocation anywhere",
+          "Every TypeScript project extends tsconfig.base.json with strict:true and noUncheckedIndexedAccess:true; include patterns cover .ts, .tsx, .mts, .cts; config test enumerates all 15 TS projects and asserts both flags and all four extensions",
+          "Pure-package lint gate (PURE_PACKAGE_GLOBS) applies to all four TS extensions for packages/; overrides restricted to packages/adapters and packages/ui; negative production-config tests using .mts and .cts fixtures confirm prohibited code is rejected end-to-end",
+          "Boundary checker validates direct edges only (not transitive closure); relative cross-workspace imports resolved and validated against DIRECT_EDGES; tests cover forbidden direct edge, transitive-violation attempt, and relative cross-workspace violation",
+          "All four gate commands exit 0 in the authoritative validation environment after npm ci; CI workflow uses npm and succeeds on committed state",
+          "SPEC_BLOCKERS.md present with §19 fields and empty registry; no contradiction invented or resolved",
+          "No production algorithm, economic logic, or unresolved DEFINIR-dependent behavior introduced"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.1 Stack — TypeScript strict, monorepo",
+          "§14.4 Estrutura — 16 mandated directories",
+          "§14.5 Arquitetura verificável — dependency-boundary lint",
+          "§13 Proibições verificáveis por lint",
+          "§17 Gate de CI",
+          "§15 FASE-1 acceptance criteria",
+          "§19 Protocolo de ambiguidade — SPEC_BLOCKERS.md",
+          "INV-26"
+        ],
+        "title": "Re-attempt monorepo bootstrap using npm workspaces, eliminating pnpm entirely",
+        "why_now": "TASK-0001 has been rejected 3 consecutive times (CYCLE-000011 through CYCLE-000024). Every rejection traces to pnpm binary resolution failing in the authoritative validation environment. Attempt-3 introduced a pnpm shim explicitly rejected by the supervisor for falsely reporting installation success. No production code has been accepted across 5 checkpoints. All other FASE-1 work is blocked until a working monorepo foundation is accepted. Switching to npm workspaces removes the package-manager root cause without any shim or workaround — npm is available in all standard environments."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/ADR-002.md specifies the hash function bit-exactly: algorithm (SplitMix64 over FNV-1a accumulator), all 11 namespace constants, test vectors; explicitly forbids native language hash",
+          "docs/decisions/ADR-004.md specifies how omitting rounding mode (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) becomes a TypeScript compile error or blocking lint error, naming the concrete enforcement mechanism",
+          "docs/decisions/ADR-009.md specifies: UTF-8 byte-order key sorting applied recursively; bigint as signed decimal ASCII without leading zeros; distinct type markers for safe-integer vs bigint so 1n and 1 never collide; undefined/NaN/Infinity/-0 as thrown errors; StateHash excludes finalTick per INV-22; SaveHash includes full envelope",
+          "Each ADR identifies which invariants it protects and which DEFINIR item it closes; no economic parameter invented without a versioned config file reference"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 — hash function is DEFINIR, specified bit-by-bit in ADR before any implementation",
+          "ADR-004 — rounding-mode enforcement mechanism is DEFINIR",
+          "ADR-009 — CanonicalEncoder specified in its own ADR before any state hash",
+          "§15 FASE-1 — ADR-009 written and encoder implemented before any StateHash exists",
+          "§19 Protocolo de ambiguidade — ADR required before resolving any DEFINIR item",
+          "INV-22",
+          "INV-12"
+        ],
+        "title": "Write ADR-002 (hash function), ADR-004 (rounding enforcement), and ADR-009 (CanonicalEncoder) before any packages/core implementation",
+        "why_now": "§15 FASE-1 acceptance criteria state explicitly: ADR-009 must be written and the CanonicalEncoder implemented before any state hash exists. ADR-002 requires the hash function specified bit-by-bit in its own ADR before any rand() implementation. ADR-004's DEFINIR on rounding-mode enforcement must be resolved before the division helper can be correctly typed. Implementing packages/core without these ADRs embeds unrecorded decisions that cannot be reversed without an encodingVersion bump invalidating all frozen reference StateHashes. These are documentation-only and can proceed in parallel with or immediately after IDEA-001."
+      },
+      {
+        "acceptance_targets": [
+          "SPEC_BLOCKERS.md contains entry for transcendental-function conflict with fields: id, conflicting sections (§5.1 and §13), impact (packages/world price generator blocked), affected fronts, status OPEN",
+          "SPEC_BLOCKERS.md contains entry for tools/* dependency edges gap with fields: id, gap (§14.5 omits tools/ directed edges), impact (tools/replay and tools/bench import targets undefined), affected fronts, status OPEN",
+          "No implementation of packages/world or tools/* that embeds a decision not yet registered in ADR or SPEC_BLOCKERS.md"
+        ],
+        "category": "documentation",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "§5.1 — log-space price construction requires Math.log/Math.exp",
+          "§13 — Math.sin, Math.cos, Math.exp, Math.log, Math.pow, Math.sqrt prohibited in pure packages",
+          "§14.5 — dependency graph defines edges for packages/ and apps/ only, not tools/",
+          "§19 Protocolo de ambiguidade — SPEC_BLOCKERS.md and ADR required on contradiction",
+          "ADR-003 — no floating point in domain",
+          "INV-19 — cross-platform identical results"
+        ],
+        "title": "Register transcendental-function and tools-dependency-edges blockers in SPEC_BLOCKERS.md",
+        "why_now": "§5.1 constructs prices in log-space requiring Math.log and Math.exp; §13 prohibits both in pure packages. This is a specification contradiction that must be registered per §19 before packages/world can be written — any implementation without a registered ADR resolving the fixed-point or lookup-table approach would embed an unrecorded decision and violate §13 lint. Separately, §14.5 defines directed edges for packages/ and apps/ but not for tools/; tools/replay and tools/bench need cross-workspace imports for FASE-1 acceptance. Both blockers are currently invisible to the implementation agent."
+      },
+      {
+        "acceptance_targets": [
+          "Branded types Money, Quantity, Price, Rate exported as bigint nominal types with constructors that reject non-bigint and non-integer inputs at the TypeScript type level; QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE constants declared",
+          "Branded Tick and noise/index types as number nominal types restricted to safe integer range; constructors reject NaN, Infinity, non-integer, and out-of-range",
+          "divInt(a, b, mode) helper where mode is the three-value enum from ADR-004; omitting mode is a TypeScript compile error; / and ** operators banned by lint for branded numeric types",
+          "rand(masterSeed, namespace, ...coords) pure function implementing ADR-002 bit-exactly; all 11 namespace constants in a namespaces file; unit tests verify identical output for identical inputs and sensitivity to each argument and namespace change",
+          "CanonicalEncoder per ADR-009: stateHash() excludes finalTick per INV-22; saveHash() includes full envelope; 1n and 1 encode differently; undefined/NaN/-0 throws; logically equal states produce equal bytes",
+          "INV-23 property test: no safe-integer overflow in arithmetic across simulated 10-year tick range (max tick ~5.3e8)",
+          "Zero §13 lint violations in the package; zero imports outside the allowed dependency graph"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "ADR-003",
+          "ADR-004",
+          "ADR-009",
+          "§4 Glossário travado — canonical type names",
+          "§14.4 packages/core",
+          "INV-12",
+          "INV-22",
+          "INV-23"
+        ],
+        "title": "packages/core — branded numeric types, positional RNG, division helpers, and CanonicalEncoder",
+        "why_now": "packages/core is the sole dependency of every other pure package. Without branded Money/Quantity/Price/Rate types (bigint) and Tick/index types (safe-integer number), ADR-003 and ADR-004 have no enforcement and violations accumulate from the first file in any dependent package. Without rand() implementing ADR-002 bit-exactly, packages/world cannot be written. Without CanonicalEncoder implementing ADR-009, no StateHash can be computed and INV-01, INV-17, INV-22 have no foundation. This is the second foundational implementation step after the monorepo and ADRs are accepted."
+      },
+      {
+        "acceptance_targets": [
+          "price(assetId, tick): Price is a pure function with no mutable state; 2-octave fractal noise via positional rand with linear interpolation at block vertices; transcendental functions implemented per ADR in fixed-point or lookup table with bit-identical cross-platform results; parameters in versioned config file; INV-02 test passes for 1000 random (asset, tick) pairs",
+          "Every Transaction validates per-commodity Entry sum is exactly zero; all minimum accounts from §6 exist; rounding residue posted per commodity with causationId; INV-13 enforced by explicit total ordering; INV-04, INV-05, INV-06, INV-07 verified by unit and property tests",
+          "Market buy and sell spot orders produce four-entry transactions balancing BRL and asset commodities separately; fee posted to venue:fees; slippage deterministic",
+          "application.processTick implements the locked 10-step canonical order from §7 in a single readable function; test verifies step ordering",
+          "Save structure per ADR-006: specVersion, rulesetVersion, encodingVersion, masterSeed, finalTick, actions; INV-21 enforced on load; INV-01 verified: replay of a reference save produces identical StateHash at every tick"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003",
+          "IDEA-004"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "high",
+        "spec_refs": [
+          "§5.1 — 2-octave fractal noise, positional, O(1)",
+          "§6 — double-entry multi-commodity ledger",
+          "§7 — 10-step canonical tick order LOCKED",
+          "§14.5 — world+domain composed only in application",
+          "ADR-003",
+          "ADR-005",
+          "ADR-006",
+          "ADR-007",
+          "INV-01",
+          "INV-02",
+          "INV-03",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-13",
+          "INV-21",
+          "INV-22",
+          "§15 FASE-1 acceptance criteria"
+        ],
+        "title": "packages/world (2-octave price generator), packages/domain (ledger + market orders), packages/application (canonical tick loop and save)",
+        "why_now": "These three packages compose the functional core required for FASE-1 acceptance. The price generator delivers INV-02. The double-entry multi-commodity ledger delivers INV-04 through INV-07. The canonical 10-step tick loop from §7 is explicitly listed in FASE-1 acceptance criteria. The save structure per ADR-006 enables CLI replay. None of these invariants are verifiable in isolation — they become testable only when composed through application, the layer that legally couples world and domain without a package-level import between them. The transcendental-function blocker (IDEA-003) must be registered and its ADR accepted before packages/world can proceed."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Repository contains only benchmark scaffolding — spec copy, checkpoint files, benchmark history. No production source code, no workspace configuration, no packages/, apps/, tools/ directories, no ADRs, no CI pipeline. TASK-0001 (Bootstrap the deterministic TypeScript monorepo and blocking architecture gates) has been attempted 3 times and rejected every time. All 5 checkpoints (through CHECKPOINT-0005 at 2026-08-14T00:24Z) report NO_ACCEPTED_CHANGES with 0 internal commits. current_task_id is null — no task is active.",
+      "highest_priority_gap": "TASK-0001 rejected 3 consecutive times; sole root cause across all rejections is pnpm binary resolution failing in the authoritative validation environment. The pnpm shim introduced in Attempt-3 was explicitly rejected by the supervisor for falsely reporting installation success without installing or validating dependencies. Switching entirely to npm workspaces (no pnpm, no pnpm shim, no pnpm-lock.yaml) is the only path that eliminates this root cause. Nothing in FASE-1 can proceed until this foundation is accepted."
+    },
+    "warnings": [
+      "CRITICAL — TASK-0001 rejected 3 consecutive times across CYCLE-000011 through current: sole root cause is pnpm unavailability in the authoritative validation environment. Any new implementation attempt MUST switch to npm workspaces with npm ci as the installation command. No pnpm shim, no pnpm-workspace.yaml, no pnpm-lock.yaml, no pnpm invocation anywhere.",
+      "SPEC CONTRADICTION — transcendental functions: §5.1 requires log-space price construction (Math.log, Math.exp for log-price arithmetic); §13 prohibits Math.sin, Math.cos, Math.exp, Math.log, Math.pow, Math.sqrt in all pure packages (packages/world is pure). An ADR specifying a fixed-point or lookup-table implementation producing bit-identical cross-platform results must be written and accepted before packages/world can implement the price generator. This is a hard blocker for IDEA-005 and has not been registered in SPEC_BLOCKERS.md yet.",
+      "DEFINIR BLOCKER — octave parameters: the number of octaves, periods, and amplitudes for trendLayer and idiosyncraticNoise are explicitly DEFINIR per §5.1 and must be fixed in a versioned configuration file with an ADR before the price generator is implemented — post-implementation changes require encodingVersion bump and invalidate all frozen reference StateHashes.",
+      "DEFINIR BLOCKER — tools/* dependency edges: §14.5 defines directed edges for packages/ and apps/ but not for tools/. tools/replay and tools/bench require cross-workspace imports to fulfill FASE-1 acceptance criteria. Allowed import edges for tools/ must be resolved in SPEC_BLOCKERS.md or an ADR before those tools acquire any cross-workspace imports.",
+      "BENCHMARK VELOCITY WARNING — 24 ideation cycles have elapsed with zero accepted production commits. The IDEA-001 npm-workspaces recommendation has been present since at least CYCLE-000020 (4 cycles ago) without a new implementation attempt being created. The benchmark is consuming cycles without advancing the implementation phase."
+    ]
+  }
+}
