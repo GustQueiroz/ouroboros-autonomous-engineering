@@ -1,0 +1,121 @@
+{
+  "created_at": "2026-08-14T04:50:42.429960+00:00",
+  "cycle_id": "CYCLE-000048",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR-009 updated with an explicit cycle and shared-reference policy: either acyclicity is required and detected with a cycle-path identity check that invokes no user code, producing a documented CanonicalEncoderError code, or a canonical reference grammar is defined and implemented with construction-order invariance; the ADR unambiguously covers self-referential arrays, objects, and Sets",
+          "Focused tests for own enumerable and non-enumerable getter/setter properties on admitted plain and null-prototype objects (including nested positions) asserting CanonicalEncoderError with zero getter and zero setter invocation counts, distinct from the existing array accessor tests",
+          "Deterministic rejection tests for cyclic self and mutual cycles in arrays, objects, and Sets, asserting the documented CanonicalEncoderError code and message with no native RangeError leaking",
+          "Submission includes captured output showing npm run compile exits 0 and npm run boundary reports OK for the exact candidate state, in addition to the existing lint and test gates"
+        ],
+        "category": "bug",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-009 — cycle and shared-reference semantics must be defined in the ADR; encoder must detect active-path cycles without executing user code",
+          "§3 ADR-009 — every admitted container element is consumed only from its own data descriptor value; accessor descriptors rejected with CanonicalEncoderError before invoking getter or setter",
+          "INV-22 — logically equal states produce identical canonical bytes regardless of construction path",
+          "§15 FASE-1 acceptance — ADR-009 written and encoder implemented before any StateHash exists",
+          "§17 CI gate — strict typecheck and dependency-boundary validation are blocking gates that must be independently evidenced in every submission"
+        ],
+        "title": "CanonicalEncoder: cycle rejection, plain-object accessor tests, and validated compilation",
+        "why_now": "TASK-0005 review-02 returned REQUEST_CHANGES with three MAJOR findings that directly block acceptance: (1) ADR-009 admits plain objects, arrays, and Sets with no acyclic restriction, and the encoder recurses without cycle detection until a native RangeError; the required change is to define cycle semantics in ADR-009 and add active-path detection that never invokes user code; (2) there are no tests for own getter/setter properties on plain objects asserting E_ACCESSOR_DESCRIPTOR with zero getter/setter invocation counts, only the already-passing array accessor tests; (3) the automated validation did not run npm run compile or npm run boundary, leaving strict typecheck and dependency boundary evidence missing from the submission. Until the encoder is accepted, no StateHash, no replay CLI, no CI hash-comparison gate, and no downstream FASE-1 invariant tests can exist."
+      },
+      {
+        "acceptance_targets": [
+          "BrowserWindow created with contextIsolation:true, nodeIntegration:false, sandbox:true in all modes including development; no webSecurity:false or allowRunningInsecureContent anywhere",
+          "apps/desktop/preload exposes only a named-channel allowlist via contextBridge; no generic invoke(channel, args) surface",
+          "apps/desktop/simulation-worker hosts the application entry; renderer source imports only packages/ui and packages/contracts",
+          "Typed IPC message contract defined in packages/contracts; structured clone used at process boundary; no JSON.stringify of any contracts value",
+          "CI electron-builder step produces a Windows installer and a Linux installer; both artifact paths verified to exist",
+          "Automated INV-29 audit script checks BrowserWindow configuration programmatically and passes in CI",
+          "Content Security Policy applied with no unsafe-eval and no remote resource loading",
+          "Minimal UI placeholder rendered in pt-BR: empty chart area, BRL balance display, buy and sell buttons, pause and 1x speed control, mandatory permanent simulation disclaimer"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.2 — process topology locked: simulation in dedicated worker; renderer is presentation only; typed message contract via structured clone; no JSON.stringify across process boundary",
+          "§14.2 — Electron security locked: contextIsolation:true, nodeIntegration:false, sandbox:true, named-channel allowlist in preload, no webSecurity:false in any mode including development",
+          "§14.6 — locked sequencing: installer for Windows and Linux exists in FASE-1 in minimal form; installer opening a blank window in FASE-1 is worth more than a perfect installer in FASE-7",
+          "§15 FASE-1 acceptance — INV-29 green; simulation in dedicated worker with typed contract; minimal UI; CI produces installer",
+          "INV-29 — contextIsolation active, nodeIntegration off, sandbox active in all execution modes"
+        ],
+        "title": "Electron secure scaffolding, process topology, and minimal CI installer",
+        "why_now": "Section 14.6 contains a locked sequencing requirement: the installer must exist in FASE-1 in minimal form; the spec explicitly warns that deferring Electron bootstrap causes ABI and native-module problems to surface too late to fix architecture. INV-29 (contextIsolation:true, nodeIntegration:false, sandbox:true, named-channel allowlist) is a named FASE-1 acceptance criterion. The process topology (simulation in dedicated worker, renderer presentation-only, typed IPC contract in packages/contracts) is also a FASE-1 gate. This track has no dependency on the encoder or core types and can proceed in parallel, reducing total FASE-1 duration."
+      },
+      {
+        "acceptance_targets": [
+          "ADR-004 written specifying the enforcement mechanism (lint rule or branded division-helper pattern); undeclared division is a compile-time or lint-time error under the chosen mechanism",
+          "Branded types Money, Quantity, Price, Rate implemented as bigint with nominal branding; constructors reject non-bigint input at compile and runtime",
+          "Branded Tick type as safe-integer number with nominal branding; constructor rejects non-integer, non-finite, and out-of-safe-integer-range values",
+          "Division helpers for TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN returning both result and residue; residue is never discarded",
+          "QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE constants defined as bigint; nocional calculation via bigint intermediates",
+          "Property test confirming no Tick or internal counter exceeds Number.MAX_SAFE_INTEGER across a simulated ten-year reference (INV-23)",
+          "All existing tests pass; lint, typecheck, and boundary checks remain green"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003 — branded bigint Money/Quantity/Price/Rate; branded safe-integer Tick; constructors reject non-integer, non-finite, and out-of-safe-integer-range values; operators / and ** prohibited",
+          "§3 ADR-004 — every division declares rounding mode TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, or ROUND_HALF_EVEN; undeclared division is compile or lint error; rounding residue never disappears",
+          "§3 ADR-003 — QUANTITY_SCALE=100_000_000, PRICE_SCALE=10_000, RATE_SCALE=100_000_000; product intermediates in bigint",
+          "§14.4 — packages/core scope: integer arithmetic, hash, RNG, canonical encoder",
+          "INV-23 — no safe-integer value exceeds 2^53 in a ten-year replay",
+          "§19 — ADR-004 enforcement mechanism is DEFINIR and requires an ADR before implementation"
+        ],
+        "title": "Core branded numeric types (ADR-003) and ADR-004 division mode enforcement",
+        "why_now": "FASE-1 requires core completo including integer arithmetic. ADR-003 types (Money, Quantity, Price, Rate as branded bigint; Tick as branded safe-integer) are fully locked in the spec with no DEFINIR ambiguity, so implementation can proceed without resolving open decisions. ADR-004 enforcement mechanism is DEFINIR and must be resolved and written as an ADR before any domain arithmetic is written; without it, the lint or compile gate on undeclared division is absent and INV-04/INV-05/INV-06/INV-07 cannot be tested. These primitives are direct prerequisites for the ledger, world price generator, and replay CLI. They have no dependency on the CanonicalEncoder."
+      },
+      {
+        "acceptance_targets": [
+          "ADR-002 written specifying the hash function algorithm bit-by-bit (e.g. SplitMix64 over FNV-1a accumulator or a documented alternative); no number with determinism effect appears in implementation before ADR is committed",
+          "rand(masterSeed, namespace, ...coordinates) → uint64 implemented as a pure function in packages/core with no mutable state, no Math.random, no Date, no external entropy",
+          "All namespaces from the §3 table implemented as typed string literal constants",
+          "Property test: rand() output is byte-for-byte reproducible from identical inputs across two independent invocations (INV-12)",
+          "Property test: two calls with different coordinates in the same namespace produce different outputs with overwhelming probability across at least 10000 sample pairs",
+          "All existing tests pass; lint, typecheck, and boundary checks remain green"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002 — rand(masterSeed, namespace, ...coordinates) → uint64; prohibited PRNG with state; prohibited Math.random; hash function is DEFINIR requiring bit-by-bit ADR specification",
+          "§3 ADR-002 — all namespaces in the table are isolated; same seed and same inputs always produce the same uint64",
+          "§14.4 — packages/core scope: hash, RNG positional",
+          "INV-12 — no generated identifier depends on external entropy; all values derivable from (seed, tick, sequence)",
+          "INV-02 — price(asset, t) queried directly equals price arrived at tick-by-tick; requires positional RNG to be correct",
+          "§19 — hash function DEFINIR must be resolved in ADR before rand() is implemented; SplitMix64 over FNV-1a is the recommended starting point"
+        ],
+        "title": "ADR-002: hash function selection and positional RNG implementation",
+        "why_now": "The positional RNG is required for FASE-1 core completion and for the world price generator. ADR-002 specifies that the hash function is DEFINIR with two locked constraints: it must be specified bit-by-bit in an ADR, and it cannot be the language's native hash. The spec recommends SplitMix64 over FNV-1a as a concrete starting point. Implementing rand() before the ADR is committed would embed unregistered approximation choices that cannot later be changed without invalidating the StateHash of existing saves. This task depends on branded types being present in packages/core to type the inputs and outputs correctly."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo bootstrap (TASK-0002) is the only accepted task: npm workspaces, strict TypeScript, ESLint determinism rules, dependency boundary checker, and CI are in place. All 16 package source files are export{} stubs. CanonicalEncoder has been attempted in TASK-0003, TASK-0004, and TASK-0005 and rejected every time. TASK-0005 review-02 returned REQUEST_CHANGES with three MAJOR findings: cyclic containers cause uncontrolled stack recursion because ADR-009 defines no cycle semantics; required plain-object accessor zero-invocation sentinel tests are absent (distinct from the passing array accessor tests); and the automated validation gate did not independently run npm run compile or npm run boundary. No ADRs have been accepted into docs/decisions/. No Electron scaffolding, installer, core types, RNG, ledger, price generator, replay CLI, or bench tooling exist.",
+      "highest_priority_gap": "ADR-009 and CanonicalEncoder remain unaccepted after three task attempts. The spec mandates the encoder and ADR-009 be accepted before any StateHash implementation, blocking the replay CLI, the CI hash-comparison gate, and all FASE-1 invariant tests that depend on state identity. The three MAJOR findings from TASK-0005 review-02 are narrow and precisely specified: define cycle and shared-reference semantics in ADR-009, add cycle detection that never executes user code, add plain-object accessor zero-invocation tests, and supply independently captured output for npm run compile and npm run boundary."
+    },
+    "warnings": [
+      "CanonicalEncoder has been attempted in three successive tasks (TASK-0003, TASK-0004, TASK-0005) and rejected each time. Each rejection introduced new findings beyond those in the prior review. The next attempt (IDEA-001) must address all three TASK-0005 review-02 findings simultaneously and must include captured command output for all four root gates (npm run compile, npm run lint, npm run boundary, npm test). Incremental fixes that resolve two of three findings will be rejected again.",
+      "ADR-004 enforcement mechanism (DEFINIR) must be resolved and written as an ADR before any bigint division expression is written in packages/domain or packages/world. Embedding a division implementation without the ADR produces an undeclared rounding-mode decision with economic effect that cannot be changed without invalidating existing save hashes.",
+      "The transcendental-function prohibition in §13, combined with the log-space price construction in §5.1, means the fixed-point or lookup-table approach for logPrice must be specified in an ADR before any packages/world price code emits values. Implementing without that ADR would embed unregistered approximation choices that cannot be changed without invalidating the StateHash of all existing reference partidas.",
+      "tools/bench calibration ratios must be frozen in FASE-1 per the §18 baseline protocol, but cannot be frozen until packages/world price generation exists. This sequential dependency must not be deferred past FASE-1 acceptance; the bench tool cannot be marked complete without frozen ratios."
+    ]
+  }
+}

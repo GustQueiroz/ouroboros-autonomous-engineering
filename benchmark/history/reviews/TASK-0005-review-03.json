@@ -1,0 +1,117 @@
+{
+  "created_at": "2026-08-14T04:38:00.958819+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 exists and unambiguously specifies the canonical byte grammar, admitted values, container ordering, duplicate or collision handling, rejection semantics, and non-execution traversal model before the implementation depends on those decisions.",
+        "evidence": "ADR §3 and the implementation reject Set subclasses with E_INVALID_SET_INSTANCE, while ADR §6 states that “Set subclasses are therefore encoded correctly.” These are incompatible canonical admission rules.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "All intrinsics used for validation, reflection, brand checking, numeric bounds, key enumeration, descriptor inspection, array recognition, byte-array recognition, and Set traversal are captured in module-private constant bindings at module initialization; encoder calls do not resolve their mutable global properties again.",
+        "evidence": "packages/core/src/canonical.ts captures numeric predicates and bounds, Reflect operations, Array/Object/Set/Uint8Array/String/TextEncoder operations, and uses those captured bindings in encoder paths.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "For every admitted container element or property, the encoder consumes only an own data descriptor's value; accessor descriptors are rejected with CanonicalEncoderError without invoking their getter or setter.",
+        "evidence": "ownDataValue uses capturedReflectGetOwnPropertyDescriptor and rejects accessor descriptors before returning descriptor.value; hostile-array.test.mjs and hostile-object.test.mjs assert zero getter/setter calls.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Proxy-wrapped candidate containers are rejected with CanonicalEncoderError without invoking user-defined traps.",
+        "evidence": "encodeValue invokes capturedIsProxy before reflection or traversal; hostile-proxy.test.mjs covers object, array, Set, revoked proxies, individual traps, nested proxies, and zero trap invocations.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Set subclasses and overridden traversal properties are safely rejected or traversed through a captured non-overridable intrinsic with zero user-code invocations.",
+        "evidence": "The implementation rejects non-Set.prototype instances and uses captured Set.prototype.forEach for accepted Sets; hostile-set.test.mjs verifies subclass rejection and zero calls to overridden Symbol.iterator and instance forEach.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Array index accessors and Proxy-wrapped arrays deterministically produce CanonicalEncoderError with zero accessor or Proxy trap handler invocations.",
+        "evidence": "hostile-array.test.mjs asserts E_ACCESSOR_DESCRIPTOR with zero getter/setter calls and E_PROXY_REJECTED with zero proxy trap calls.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Replacing mutable globals, including Number.isNaN and Number.isInteger, after module import does not change canonical bytes or rejection classes/messages for identical inputs.",
+        "evidence": "The implementation captures these bindings, but the required rejection regression tests are ineffective: every generic monkeypatch rejection test encodes undefined, so patches to Number.isNaN, Number.isInteger, Number.isFinite, Number.isSafeInteger, Object.is, and reflection operations are never exercised on their corresponding rejection paths.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Logically equal admitted states with different insertion or construction order encode to byte-identical output, satisfying INV-22.",
+        "evidence": "Object entries and Set element encodings are byte-sorted; order-invariance.test.mjs and shared-reference tests compare byte-identical outputs across differing construction orders.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "All pre-existing accepted tests, strict typecheck, lint, dependency-boundary checks, and CI validation remain green.",
+        "evidence": "Automated validation independently ran npm ci, git diff --check, lint, and tests, but did not run npm run compile or npm run boundary. It explicitly warns that no typecheck script exists. The Implementer report alone is insufficient proof that those omitted gates ran on the exact candidate.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "No StateHash implementation is introduced until this encoder and ADR-009 are accepted.",
+        "evidence": "The candidate adds CanonicalEncoder exports and tests but no StateHash implementation or hash-function selection.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "ADR §3 assigns Set subclasses E_INVALID_SET_INSTANCE, and canonical.ts enforces that rule by requiring capturedSetPrototype identity. ADR §6 instead says overridden properties “and Set subclasses are therefore encoded correctly.” The canonical admitted-value and rejection contract is therefore ambiguous.",
+        "id": "REVIEW-001",
+        "required_change": "Make ADR-009 consistently state that Set subclasses are rejected, matching the implementation and tests, or consistently admit them through the proven intrinsic path and update implementation/tests accordingly within the task’s permitted alternatives.",
+        "severity": "MAJOR",
+        "title": "ADR-009 contradicts itself on Set subclasses"
+      },
+      {
+        "evidence": "In monkeypatch.test.mjs, each generic rejection test patches an intrinsic and then encodes undefined. That input exits at E_UNDEFINED before Number.isNaN, Number.isInteger, Number.isFinite, Number.isSafeInteger, Object.is, Array.isArray, or Reflect operations are used. Consequently these tests cannot detect mutable-global resolution on rejection paths.",
+        "id": "REVIEW-002",
+        "required_change": "For every captured mutable intrinsic, test an identical input that actually reaches the affected path before and after patching. At minimum cover NaN, fractional numbers, infinities, unsafe integers, -0, arrays, object reflection, descriptors, prototypes, and Reflect.apply-dependent paths, asserting the same CanonicalEncoderError code, path, and message.",
+        "severity": "MAJOR",
+        "title": "Monkeypatch rejection tests do not exercise patched validation paths"
+      },
+      {
+        "evidence": "Automated validation ran dependency installation, git diff check, lint, and npm test only. It did not execute npm run compile or npm run boundary, despite both being explicit acceptance gates. The automated output also warns that no typecheck script exists.",
+        "id": "REVIEW-003",
+        "required_change": "Run and provide successful output for npm run compile and npm run boundary on the exact candidate state, along with the existing lint and full-test gates. Clarify that compile is the repository’s strict TypeScript validation or add/run the canonical typecheck gate if the repository defines another one.",
+        "severity": "MAJOR",
+        "title": "Required compile/typecheck and boundary validation are not independently evidenced"
+      }
+    ],
+    "invariants_checked": [
+      "INV-22 canonical-byte equality across insertion and construction order",
+      "Safe-integer-only number encoding and rejection of NaN, infinities, fractions, unsafe integers, and -0",
+      "Descriptor-only array and object traversal",
+      "Proxy rejection before reflective operations or traversal",
+      "Captured intrinsic Set traversal without caller iterator execution",
+      "No JSON serialization, locale-sensitive ordering, Math.random, Date, or external entropy in the encoder",
+      "Package boundary placement in packages/core",
+      "No StateHash implementation introduced",
+      "Cycle rejection and active-path cleanup",
+      "UTF-8 ordering and ill-formed UTF-16 rejection"
+    ],
+    "risks": [
+      "The contradictory ADR could cause later consumers to depend on incompatible Set-subclass behavior.",
+      "The current monkeypatch suite can remain green even if several validation paths regress to resolving mutable globals at call time.",
+      "Without independently executed compile and boundary gates, strict typing and architectural compatibility are not established for the exact candidate."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The encoder implementation is broadly aligned with the task, but ADR-009 contradicts its own Set-subclass rule, required monkeypatch rejection tests do not exercise the patched intrinsics, and automated validation does not independently establish compile/typecheck or dependency-boundary success.",
+    "task_id": "TASK-0005",
+    "validation_assessment": {
+      "missing": [
+        "Independent successful npm run compile output",
+        "Independent successful npm run boundary output",
+        "Meaningful rejection-path monkeypatch tests for each captured mutable intrinsic",
+        "CI-equivalent evidence including all four repository gates"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 3,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0005"
+}

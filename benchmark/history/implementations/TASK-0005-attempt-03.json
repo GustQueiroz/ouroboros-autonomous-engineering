@@ -1,0 +1,70 @@
+{
+  "attempt": 3,
+  "created_at": "2026-08-14T04:36:12.333988+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "changed_files": [
+      "packages/core/src/canonical.ts",
+      "docs/decisions/0009-canonical-encoder.md",
+      "tests/canonical/hostile-cycle.test.mjs",
+      "tests/canonical/hostile-object.test.mjs"
+    ],
+    "findings": [
+      {
+        "finding_id": "REVIEW-001",
+        "resolution": "ADR-009 §2 now requires admitted graphs to be acyclic and clarifies that shared non-cyclic references are admitted by value; §3 lists E_CYCLE with a stable message; §6 defines the identity-only active-path scan pushed before container dispatch and popped in finally; §9 records rejection of reference-labelling and silent-dedup alternatives. In packages/core/src/canonical.ts a module-private activeStack tracks in-flight container references. encodeValue scans the stack with === before dispatching to encodeArray/encodeObject/encodeSet, throws CanonicalEncoderError('E_CYCLE') on match without executing user code, and pops in a finally block. canonicalEncode also resets activeStack.length = 0 in its own finally as belt-and-braces. tests/canonical/hostile-cycle.test.mjs asserts E_CYCLE at exact back-edge paths for self-cycles in array, plain object, null-prototype object, and Set, mutual cycles in arrays and objects, a mixed object→array→object cycle, and a three-level-deep cycle. It also asserts that shared references between siblings are admitted and encode identically to freshly-constructed logically-equal objects, and that stack state does not leak across top-level calls.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-002",
+        "resolution": "Added tests/canonical/hostile-object.test.mjs with seven sentinel tests covering: (a) enumerable own getter+setter on a plain object, (b) non-enumerable own accessor, (c) accessor on a null-prototype object, (d) nested plain-object accessor with deep path '$.deep.y', (e) setter-only accessor, (f) accessor on a null-prototype object nested inside a plain object, and (g) accessor alongside a valid data property. Each test asserts CanonicalEncoderError with code E_ACCESSOR_DESCRIPTOR, the exact err.path, and both getterCalls and setterCalls remaining at 0.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-003",
+        "resolution": "Executed the full acceptance gate on the exact candidate state and captured the output: `npm run compile` completed with exit 0 and rebuilt packages/core/dist/{canonical,index}.{js,d.ts}; `npm run boundary` reported 'dependency-boundary: OK. 15 workspace packages validated against §14.5.'; `npm run lint` completed with exit 0 and no warnings; `npm test` reported '# tests 176 # pass 176 # fail 0'. All gates independently green.",
+        "status": "RESOLVED"
+      }
+    ],
+    "notes_for_reviewer": [
+      "Cycle detection uses strict identity in a module-private array to avoid using Set internally (consistent with ADR-009 §6 constraint that global Set never participates in encoder paths). The scan is O(depth) and pushes/pops in a finally block; canonicalEncode also unconditionally clears the stack in its own finally as a belt-and-braces guarantee.",
+      "Shared non-cyclic references are admitted and encode by value at each occurrence; a new test verifies bytes-equality against a freshly-constructed logically-equal state.",
+      "E_CYCLE paths point at the offending back-edge, not the root: '$[0]' for self-cycle in an array, '$.self' for a self-referential object, '$<0>' for a self-referential Set, '$[0][0]'/'$.forward.back'/'$.items[0]'/'$.level.child.back' for deeper cycles.",
+      "The seven hostile-object accessor tests exercise the plain-object property path with getter/setter invocation counters kept at zero, closing the coverage gap flagged by REVIEW-002.",
+      "No changes were made under /constitution and no unrelated files were modified. Only canonical.ts (encoder + new error code), 0009-canonical-encoder.md (spec updates for cycle handling), and the two new test files were touched. Pre-existing modified files package.json and packages/core/src/index.ts from the prior candidate iteration were not further changed."
+    ],
+    "remaining_issues": [],
+    "review_iteration": 2,
+    "status": "COMPLETED",
+    "summary": "Addressed all three MAJOR findings from the Supervisor review. (1) Added cyclic-container semantics to ADR-009 §2/§3/§6/§9 and implemented deterministic active-path cycle detection in packages/core/src/canonical.ts, emitting a new stable CanonicalEncoderError code E_CYCLE at the back-edge path; shared non-cyclic references are explicitly admitted with by-value encoding. (2) Added tests/canonical/hostile-object.test.mjs covering enumerable, non-enumerable, null-prototype, nested, setter-only, and sibling-of-data-property accessor cases on plain objects, each asserting E_ACCESSOR_DESCRIPTOR, the exact path, and zero getter/setter invocations. (3) Ran and independently evidenced npm run compile (exit 0), npm run boundary (OK, 15 packages), npm run lint (exit 0), and the full test suite (176/176 pass) on the exact candidate state.",
+    "task_id": "TASK-0005",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json exit 0; dist rebuilt cleanly under strict TypeScript"
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary: OK. 15 workspace packages validated against §14.5."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 exit 0; no lint issues"
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "176 tests, 176 pass, 0 fail; includes 12 new hostile-cycle tests and 7 new hostile-object tests"
+      },
+      {
+        "command": "node --test tests/canonical/hostile-cycle.test.mjs tests/canonical/hostile-object.test.mjs",
+        "result": "PASS",
+        "summary": "focused rerun of the new test files: 19 tests, 19 pass"
+      }
+    ]
+  },
+  "task_id": "TASK-0005"
+}

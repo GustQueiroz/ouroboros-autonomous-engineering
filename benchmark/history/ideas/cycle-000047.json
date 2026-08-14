@@ -1,0 +1,132 @@
+{
+  "created_at": "2026-08-14T04:45:52.099417+00:00",
+  "cycle_id": "CYCLE-000047",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR-009 document explicitly states containers are acyclic; cycles and shared references are rejected with a stable CanonicalEncoderError code before any recursive call",
+          "Self-cycle and mutual-cycle tests for arrays, objects, and Sets assert CanonicalEncoderError and zero getter/setter/trap invocations",
+          "Hostile plain-object accessor tests (enumerable and non-enumerable own descriptors on plain-prototype and null-prototype objects, nested cases) assert E_ACCESSOR_DESCRIPTOR with zero invocation counters",
+          "Automated validation captures and supplies raw output of npm run compile and npm run boundary in addition to lint and test"
+        ],
+        "category": "bug",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-009",
+          "INV-22",
+          "Section 12 INV-22",
+          "Section 16 CI gate step compile and boundary",
+          "TASK-0005-review-02 REVIEW-001 REVIEW-002 REVIEW-003"
+        ],
+        "title": "Resolve three TASK-0005-review-02 MAJOR findings to unblock CanonicalEncoder acceptance",
+        "why_now": "TASK-0005 attempt 2 was rejected with three independent MAJOR findings. All three are precisely scoped: add an acyclic restriction and cycle-rejection rule to ADR-009 and implement cycle detection in the encoder; add hostile plain-object accessor tests (enumerable and non-enumerable own getters/setters on plain and null-prototype objects) asserting E_ACCESSOR_DESCRIPTOR with zero invocation counters; capture successful npm run compile and npm run boundary output as part of the automated validation evidence. Until all three are resolved the encoder cannot be accepted, and no FASE-1 type primitives can build on it."
+      },
+      {
+        "acceptance_targets": [
+          "Tick is a branded safe number (non-negative, monotonic constraint documented)",
+          "Money, Price, Quantity, Rate are branded bigint types with no float literals or transcendentals",
+          "Construction functions reject values outside their valid range with typed errors",
+          "Lint and boundary checks remain green; no float literals appear in packages/core"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-001",
+          "ADR-003",
+          "Section 4 domain glossary",
+          "Section 13 lint prohibitions float-literal"
+        ],
+        "title": "Implement core branded primitive types: Tick, Money, Price, Quantity, Rate",
+        "why_now": "ADR-001 and ADR-003 are TRAVADO. Every other FASE-1 component (PRNG, rounding, ledger, world price, order matching) depends on these types existing in packages/core. Nothing can be constructed or tested in the domain model without them. They carry no external dependencies and can be implemented and tested in isolation immediately after the encoder is accepted."
+      },
+      {
+        "acceptance_targets": [
+          "SPEC_BLOCKERS.md contains BLOCKER-0001 with status PROVISIONAL for the ADR-002 hash function choice",
+          "Provisional decision records the chosen algorithm (SplitMix64 over FNV-1a), the rejected alternatives, rationale, and an isolated removable test reference",
+          "No other DEFINIR items are silently baked into implementation without a corresponding entry"
+        ],
+        "category": "documentation",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "Section 19 ambiguity protocol",
+          "SPEC_BLOCKERS.md template"
+        ],
+        "title": "Register DEFINIR provisional decisions required for PRNG implementation (ADR-002 hash function)",
+        "why_now": "ADR-002 marks the hash function as DEFINIR (recommended: SplitMix64 over FNV-1a). SPEC_BLOCKERS.md currently has no entries. The §19 protocol requires a provisional decision to be registered in SPEC_BLOCKERS.md with an isolated removable test before any DEFINIR item is implemented. Implementing the PRNG without this entry means the choice is undocumented and untracked, violating the §19 cap-of-five and reversibility requirements. This entry unblocks IDEA-004 and costs almost nothing."
+      },
+      {
+        "acceptance_targets": [
+          "rand(masterSeed, namespace, ...coordinates) returns a branded uint64 bigint",
+          "Implementation uses only the provisionally-decided hash algorithm with no Math.random, no Date, no crypto, no stateful PRNG",
+          "Cross-platform determinism test asserts identical output for a fixed input vector",
+          "Lint and boundary checks remain green"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "INV-19",
+          "Section 5 world engine",
+          "Section 13 lint prohibitions Math.random crypto"
+        ],
+        "title": "Implement positional PRNG: rand(masterSeed, namespace, ...coordinates) -> uint64",
+        "why_now": "ADR-002 is TRAVADO. The PRNG is required by the world engine (price generation, bot decisions, macro events, NPC tips) and must be available in packages/core before any of those systems can be built. It is stateless and position-addressed, so it is independently testable: the same inputs must always produce the same uint64 output on any platform (INV-19). Depends on branded types (IDEA-002) for the masterSeed type and on the DEFINIR provisional decision (IDEA-003) for the algorithm choice."
+      },
+      {
+        "acceptance_targets": [
+          "divide(dividend, divisor, mode) is exported from packages/core with all three rounding modes",
+          "Residue is returned alongside the quotient so callers can route it to the correct ledger account",
+          "No float literals, no transcendentals, no implicit rounding appear in the implementation",
+          "Tests cover all three modes for positive, negative, and zero dividends/divisors, and verify that quotient * divisor + residue === dividend exactly"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-005",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "INV-04",
+          "INV-07",
+          "Section 6 ledger named accounts world:rounding_residue"
+        ],
+        "title": "Implement division with explicit rounding mode (ADR-004)",
+        "why_now": "ADR-004 is TRAVADO. Every monetary computation that involves division must declare its rounding mode (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) and route the residue to world:rounding_residue:<COMMODITY>. Without this primitive the ledger, order fill logic, and funding rate calculations cannot be implemented correctly. It depends only on branded bigint types and carries no DEFINIR items, so it can proceed in parallel with IDEA-003 and IDEA-004."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo skeleton accepted (TASK-0002). All 16 package/app/tool workspaces exist with empty stub exports. No production domain code is committed. TASK-0005 (CanonicalEncoder hardening) is on attempt 2, rejected by TASK-0005-review-02 with three MAJOR findings: cyclic container semantics undefined in ADR-009, plain-object accessor hostile tests absent, and compile/boundary validation not independently evidenced.",
+      "highest_priority_gap": "CanonicalEncoder (ADR-009) cannot be accepted until cycle/acyclic semantics are defined in the ADR document, the plain-object accessor test gap is closed, and npm run compile plus npm run boundary are captured in validation evidence. This is the sole active work front blocking all subsequent FASE-1 foundational types."
+    },
+    "warnings": [
+      "SPEC_BLOCKERS.md has no entries. ADR-002 (hash function), ADR-007 (IMPACT_WINDOW), and Section 5 (BOT_DECISION_PERIOD) all carry DEFINIR markers. Implementing any of these without a SPEC_BLOCKERS provisional decision entry violates the §19 reversibility and tracking protocol. The five-entry cap is currently unused, so there is capacity to register them.",
+      "TASK-0005 has now consumed two attempts and three review cycles without acceptance. Each rejection has introduced new scope (cycle semantics, accessor tests, compile evidence). Implementers should treat all three REVIEW findings as a single atomic deliverable rather than addressing them incrementally across further attempts, as partial fixes have so far not satisfied the acceptance gate."
+    ]
+  }
+}
