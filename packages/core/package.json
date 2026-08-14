@@ -2,6 +2,6 @@
   "name": "@ciclo/core",
   "version": "0.0.0",
   "private": true,
-  "main": "src/index.ts",
-  "types": "src/index.ts"
+  "main": "src/index.mts",
+  "types": "src/index.mts"
 }

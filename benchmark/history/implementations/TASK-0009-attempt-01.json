@@ -1,0 +1,103 @@
+{
+  "attempt": 1,
+  "created_at": "2026-08-14T10:44:44.021604+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 is committed under docs/decisions and fully specifies byte-level encodings for every supported type, object keys, ordered collections, unordered collections, and all rejected values.",
+        "evidence": "docs/decisions/0009-canonical-encoding.md documents the supported value domain, per-type byte layout with type tags N/T/F/I/B/S/O/L/U, sign and length-prefix rules, UTF-8-byte key ordering, unordered-collection sort-by-encoded-bytes, and the eleven typed rejection codes with their triggers.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "CanonicalEncoder output conforms to ADR-009 and is deterministic for repeated encoding of the same logical value.",
+        "evidence": "packages/core/src/canonical-encoder.mts implements the ADR byte-for-byte. The 'determinism' test in tests/core/canonical-encoder.test.mjs encodes an object with nested Array/Set/Map three times (with permuted insertion) and asserts identical bytes.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Objects or maps with identical entries but different insertion order produce identical bytes, with keys ordered by their UTF-8 byte sequences rather than locale-sensitive comparison.",
+        "evidence": "Tests 'insertion order does not affect object encoding', 'insertion order does not affect Map encoding', 'UTF-8 key ordering ignores locale-sensitive collation', 'UTF-8 key ordering places short ASCII-only prefix before its longer superset', and 'UTF-8 key ordering sorts precomposed and decomposed keys by raw byte sequence' all pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Unordered collections with identical logical members but different insertion order produce identical bytes; ordered collections preserve order and produce different bytes when element order differs.",
+        "evidence": "Tests 'insertion order does not affect Set encoding', 'ordered collection is sensitive to element order', and 'unordered collection ignores element order but ordered collection does not' pass. Encoder sorts Set members by their fully-encoded byte string.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Values that are logically distinct by supported type or structure do not share an encoding in the required collision-separation test corpus, including bigint versus safe integer and ordered versus unordered collections.",
+        "evidence": "Tests 'type separation: bigint 1n and safe integer 1 never collide', 'type separation: scalar vs single-item ordered collection', 'type separation: single-item ordered vs unordered collection with same member', 'type separation: object key vs value with same lexical text', 'type separation: null distinct from boolean false and from empty string', and 'type separation: full collision-separation corpus is unique' (27-value corpus) all pass. Map/plain-object equivalence documented in ADR is verified by 'map / plain object equivalence' test.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Encoding rejects undefined, NaN, positive and negative Infinity, negative zero, unsafe integers, unsupported runtime values, and cyclic structures with deterministic typed errors.",
+        "evidence": "CanonicalEncoderError with stable code strings (CANONICAL_UNDEFINED, CANONICAL_NAN, CANONICAL_POSITIVE_INFINITY, CANONICAL_NEGATIVE_INFINITY, CANONICAL_NEGATIVE_ZERO, CANONICAL_NON_INTEGER, CANONICAL_UNSAFE_INTEGER, CANONICAL_UNSUPPORTED_VALUE, CANONICAL_UNSUPPORTED_KEY, CANONICAL_MALFORMED_STRING, CANONICAL_CYCLIC_REFERENCE). All eleven rejection paths have dedicated tests that assert both the error class and the code.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No StateHash or SaveHash implementation is introduced by this change.",
+        "evidence": "packages/core exports only CanonicalEncoder/canonicalEncode plus error types and version constant. No hashing primitive is added; ADR-009 explicitly leaves StateHash and SaveHash to future work.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Core sources pass the repository typecheck, lint, determinism lint, and package-boundary checks.",
+        "evidence": "npm run compile, npm run lint, npm run boundary, and npm run test all exit 0. Determinism lint rules (§13) are enforced by eslint via packages/**/*.{ts,tsx,mts,cts}; the encoder uses Reflect.ownKeys instead of Object.keys, byte comparators for every sort, integer arithmetic only, and no forbidden globals.",
+        "status": "PASS"
+      }
+    ],
+    "adrs_created_or_updated": [
+      "docs/decisions/0009-canonical-encoding.md"
+    ],
+    "changed_files": [
+      "docs/decisions/0009-canonical-encoding.md",
+      "packages/core/src/canonical-encoder.mts",
+      "packages/core/src/index.mts",
+      "packages/core/src/index.ts",
+      "packages/core/package.json",
+      "package.json",
+      "tests/core/canonical-encoder.test.mjs"
+    ],
+    "discovered_out_of_scope_issues": [],
+    "invariants_affected": [
+      "INV-13",
+      "INV-22",
+      "INV-23",
+      "INV-26"
+    ],
+    "known_issues": [],
+    "notes_for_reviewer": [
+      "The encoder emits a single Uint8Array. Each element carries a distinct ASCII type tag (N/T/F/I/B/S/O/L/U) so that bigint-vs-integer, ordered-vs-unordered, and scalar-vs-collection cannot collide byte-wise.",
+      "Object keys and Map keys share the same 'O' tag by design (ADR-009): { a: 1 } and new Map([['a', 1]]) encode identically because they express the same logical structure. This is verified by an explicit equivalence test.",
+      "UTF-8 is implemented in-package (no reliance on TextEncoder) so the algorithm is auditable and stays portable. Unpaired surrogates are rejected as CANONICAL_MALFORMED_STRING rather than silently replaced with U+FFFD, in line with the 'no implicit normalization' clause of ADR-009.",
+      "The empty index.ts stub in packages/core was replaced with index.mts so the compiled artifact is an ESM module (dist/index.mjs) that the .mjs test suite can import directly. packages/core/package.json main/types were updated accordingly.",
+      "The root package.json test script now includes tests/core/*.test.mjs and gained a pretest hook (npm run compile) so npm test still works from a clean checkout. CI already compiles before test so behavior on CI is unchanged.",
+      "No StateHash or SaveHash exists yet; the encoder exposes CANONICAL_ENCODING_VERSION for future hashing layers to include in their input per §14.4."
+    ],
+    "status": "COMPLETED",
+    "summary": "Recorded ADR-009 defining the canonical state encoding format and implemented a deterministic CanonicalEncoder in packages/core. The encoder covers the FASE-1 value domain (null, boolean, safe integer, bigint, string, plain object, Map, Array, Set), sorts object/map keys by UTF-8 byte order, distinguishes ordered from unordered collections, and rejects undefined, NaN, ±Infinity, -0, unsafe integers, unsupported runtime values, malformed UTF-16 strings, and cyclic structures via typed CanonicalEncoderError codes. Added an .mjs test suite covering golden byte vectors, UTF-8 ordering, insertion-order permutations, order sensitivity, type/structure separation, and every rejection path. All four repository gates pass.",
+    "task_id": "TASK-0009",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json succeeded for all workspace projects."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . exited clean, including the new packages/core/src/*.mts sources."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary: OK. 15 workspace packages validated against §14.5."
+      },
+      {
+        "command": "npm run test",
+        "result": "PASS",
+        "summary": "101/101 tests passed (config, lint, boundary, and the 46 new canonical-encoder tests in tests/core/canonical-encoder.test.mjs)."
+      }
+    ]
+  },
+  "task_id": "TASK-0009"
+}

@@ -29,7 +29,8 @@
     "compile": "tsc -b tsconfig.json",
     "lint": "eslint --max-warnings=0 .",
     "boundary": "node tools/boundary/check.mjs",
-    "test": "node --test \"tests/config/*.test.mjs\" \"tests/lint/*.test.mjs\" \"tests/boundary/*.test.mjs\""
+    "pretest": "npm run compile",
+    "test": "node --test \"tests/config/*.test.mjs\" \"tests/lint/*.test.mjs\" \"tests/boundary/*.test.mjs\" \"tests/core/*.test.mjs\""
   },
   "devDependencies": {
     "@typescript-eslint/parser": "8.15.0",

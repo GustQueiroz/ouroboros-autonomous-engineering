@@ -1,0 +1,80 @@
+{
+  "created_at": "2026-08-14T10:46:15.391703+00:00",
+  "decision": "APPROVE",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 is committed under docs/decisions and fully specifies byte-level encodings for every supported type, object keys, ordered collections, unordered collections, and all rejected values.",
+        "evidence": "docs/decisions/0009-canonical-encoding.md defines the closed value domain, tags N/T/F/I/B/S/O/L/U, framing, UTF-8 encoding and ordering, collection semantics, stable rejection codes, and version policy.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "CanonicalEncoder output conforms to ADR-009 and is deterministic for repeated encoding of the same logical value.",
+        "evidence": "packages/core/src/canonical-encoder.mts implements the specified tags and framing; repeated and insertion-permuted nested-value tests passed in the 101-test automated run.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Objects or maps with identical entries but different insertion order produce identical bytes, with keys ordered by their UTF-8 byte sequences rather than locale-sensitive comparison.",
+        "evidence": "Object and Map entries are sorted with compareBytes over utf8Encode(key); UTF-16/UTF-8 divergence, locale-sensitive, normalization-form, and insertion-permutation tests passed.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Unordered collections with identical logical members but different insertion order produce identical bytes; ordered collections preserve order and produce different bytes when element order differs.",
+        "evidence": "Set members are sorted by complete encoded bytes while arrays are emitted by index; corresponding insertion-independence and order-sensitivity tests passed.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Values that are logically distinct by supported type or structure do not share an encoding in the required collision-separation test corpus, including bigint versus safe integer and ordered versus unordered collections.",
+        "evidence": "Distinct tags separate scalar and structural forms. The 27-value uniqueness corpus and focused bigint/integer, scalar/list, list/set, key/value, and null/boolean/string tests passed.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Encoding rejects undefined, NaN, positive and negative Infinity, negative zero, unsafe integers, unsupported runtime values, and cyclic structures with deterministic typed errors.",
+        "evidence": "CanonicalEncoderError exposes stable codes for each rejection category; automated tests passed for all required numeric cases, undefined, representative unsupported values, unsupported keys, malformed strings, and object/array cycles.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No StateHash or SaveHash implementation is introduced by this change.",
+        "evidence": "The changed implementation exports only canonical encoding APIs, error definitions, value types, and an encoding-version constant; no hash implementation or hash dependency was added.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Core sources pass the repository typecheck, lint, determinism lint, and package-boundary checks.",
+        "evidence": "Automated validation passed npm lint and all 101 tests; npm test runs the compile pretest and the repository boundary/config/lint suites. The implementer additionally reports successful standalone compile, lint, and boundary commands.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "APPROVE",
+    "findings": [],
+    "invariants_checked": [
+      "INV-22 canonical representation and type/structure separation",
+      "INV-23 deterministic encoding and ordering",
+      "INV-26 package architecture and dependency boundaries",
+      "UTF-8 byte ordering independent of locale and UTF-16 ordering",
+      "Ordered versus unordered collection semantics",
+      "Typed deterministic rejection of prohibited values and cycles",
+      "No StateHash or SaveHash introduced",
+      "No floating-point arithmetic or rounding behavior added",
+      "No ledger behavior affected",
+      "No replay/state-hash computation affected",
+      "No validation weakening, skipped tests, retries, or tolerance loosening identified",
+      "No temporary or debug artifacts identified"
+    ],
+    "risks": [
+      "Encoding very large bigint or deeply nested inputs remains proportional to input size and nesting depth; this is inherent to the accepted unbounded value domain and is not a task regression."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The candidate defines ADR-009, implements the documented deterministic canonical encoding domain, provides substantive golden/order/separation/rejection coverage, introduces no hashing, and passes the relevant repository gates without unrelated scope expansion.",
+    "task_id": "TASK-0009",
+    "validation_assessment": {
+      "missing": [],
+      "sufficient": true
+    }
+  },
+  "review_iteration": 1,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0009"
+}
