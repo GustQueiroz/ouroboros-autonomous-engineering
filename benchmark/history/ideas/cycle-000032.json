@@ -1,0 +1,172 @@
+{
+  "created_at": "2026-08-14T01:41:30.927838+00:00",
+  "cycle_id": "CYCLE-000032",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR-002 written specifying the hash function algorithm bit-by-bit (SplitMix64 over FNV-1a accumulator or equivalent registered choice)",
+          "ADR-004 written specifying the technical enforcement mechanism for rounding-mode declaration",
+          "ADR-009 written specifying CanonicalEncoder: UTF-8 byte key ordering, bigint as decimal ASCII with explicit sign, distinct marker for safe integers, prohibition of undefined/NaN/Infinity/-0, ordered vs unordered collection encoding, encodingVersion participation",
+          "Branded bigint types Money, Quantity, Price, Rate with nominal constructors rejecting non-bigint input",
+          "Nominal Tick type backed by safe integer with constructor rejecting non-integer and out-of-range input",
+          "rand(masterSeed, namespace, ...coordinates) pure function producing deterministic uint64 via the specified hash with all namespaces from §3 ADR-002 table",
+          "CanonicalEncoder producing identical bytes for logically identical states and different bytes for logically different states",
+          "Division helpers enforcing explicit rounding mode; calling division without mode is a type or lint error",
+          "INV-22 test: two logically equal states produce equal canonical bytes; finalTick excluded from StateHash",
+          "INV-23 test: no safe-integer value exceeds 2^53 in a ten-year reference computation",
+          "All packages/core tests pass under npm run test with no floating-point use, no Math.random, no Date"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "large",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002 — positional RNG, rand(seed, namespace, ...coordinates), hash function is DEFINIR requiring ADR",
+          "§3 ADR-003 — branded bigint Money/Quantity/Price/Rate, nominal Tick as safe integer",
+          "§3 ADR-004 — every division declares rounding mode; enforcement mechanism is DEFINIR requiring ADR",
+          "§3 ADR-009 — CanonicalEncoder: key ordering, bigint representation, safe-integer marker, prohibited values, encodingVersion",
+          "§14.4 — packages/core scope: integer arithmetic, hash, RNG, fixed-point, canonical encoder",
+          "§15 FASE-1 acceptance: ADR-009 written and encoder implemented before any StateHash exists",
+          "INV-12 — no identifier depends on external entropy",
+          "INV-22 — two logically equal states produce equal canonical bytes; finalTick excluded from StateHash",
+          "INV-23 — no safe-integer value exceeds 2^53 in a reference computation",
+          "§19 — DEFINIR items require ADR before implementation"
+        ],
+        "title": "Implement packages/core: ADRs, branded types, RNG, CanonicalEncoder",
+        "why_now": "Every other FASE-1 deliverable depends on packages/core. The spec explicitly mandates that ADR-009 be written and the CanonicalEncoder implemented before any StateHash can exist. The hash function required by ADR-002 is a DEFINIR item that must be specified in an ADR before implementation begins. Currently every package is a stub export with zero production code. No hash, no RNG, no nominal types, and no canonical encoding means INV-01, INV-02, INV-12, INV-22, INV-23 cannot be tested and world, domain, application, and replay CLI cannot be built correctly. This is the single hardest blocker in the repository."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main creates BrowserWindow with contextIsolation:true, nodeIntegration:false, sandbox:true; no webSecurity:false in any configuration including development",
+          "apps/desktop/preload exposes only a named-channel allowlist via contextBridge; no generic invoke(channel, args) surface",
+          "apps/desktop/simulation-worker hosts simulation; renderer imports only packages/ui and packages/contracts, never packages/application, domain, or world",
+          "Minimal UI renders: price chart via lightweight-charts, BRL balance display, buy and sell buttons, pause and 1x speed control, and mandatory permanent simulation disclaimer in pt-BR",
+          "CI produces Windows installer (.exe) and Linux installer (.AppImage or .deb) via electron-builder; both artifacts verified to exist",
+          "INV-29 automated audit passes in CI (contextIsolation, nodeIntegration, sandbox checked programmatically, not just by convention)",
+          "Typed message contract between processes defined in packages/contracts; structured clone used at IPC boundary, not JSON.stringify"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "large",
+        "id": "IDEA-002",
+        "risk": "high",
+        "spec_refs": [
+          "§14.2 — process topology: main owns filesystem, simulation-worker hosts application, renderer is presentation only",
+          "§14.2 — Electron security: contextIsolation true, nodeIntegration false, sandbox true, preload allowlist with no generic invoke",
+          "§14.6 — FASE-1 requires a minimal installer for Windows and Linux even if the app does little",
+          "§15 FASE-1 acceptance: INV-29 green, simulação já rodando em worker dedicado, interface mínima com gráfico, saldo, compra, venda, pausa e 1x",
+          "INV-29 — contextIsolation active, nodeIntegration off, sandbox active in all modes including development",
+          "§17 CI gate item 7 — build installer on both platforms with artifact verification",
+          "§17 CI gate item 8 — INV-29 automated security audit"
+        ],
+        "title": "Electron desktop scaffolding: secure BrowserWindow, worker separation, minimal UI, installer",
+        "why_now": "The spec states explicitly in §14.6 that the installer must exist in FASE-1 in minimal form and warns that deferring Electron bootstrap until later causes ABI and native-module issues to surface too late to fix. INV-29 (contextIsolation active, nodeIntegration off, sandbox active) is a FASE-1 acceptance criterion. The simulation worker separation from the renderer thread is a locked architectural requirement. Crucially, this work has no dependency on packages/core and can proceed in parallel with IDEA-001, maximizing throughput."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written specifying octave count, periods, and amplitudes for ORB and NEXA; values stored in a versioned config file",
+          "logPrice(asset, tick) implemented as pure function in packages/world with trendLayer and idiosyncraticNoise only (no macroImpact or pegAnchor required in FASE-1)",
+          "No floating-point arithmetic or prohibited Math functions used; interpolation and exponentiation implemented in fixed-point",
+          "INV-02 test: price queried at tick T equals price reached advancing tick-by-tick from 0 to T, for both assets, across at least 1000 sampled ticks",
+          "INV-03 test: two calls with identical seed and different player action logs produce identical worldPrice series",
+          "price(asset, tick) executes within 2µs budget on reference hardware as measured by tools/bench"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 — logPrice construction: trendLayer, idiosyncraticNoise, fractional octave interpolation, positional sampling",
+          "§3 ADR-002 — RNG namespaces: market.trend, market.regime, market.factor",
+          "§3 ADR-003 — no floating point; transcendental functions must use fixed-point or lookup",
+          "§15 FASE-1 acceptance: gerador de preço com duas camadas de ruído e dois ativos",
+          "INV-02 — price(asset, t) queried directly equals price reached tick-by-tick",
+          "INV-03 — player actions do not alter worldPrice series",
+          "§18 — price(asset, tick) budget: 2µs",
+          "§19 — DEFINIR: octave count, periods, amplitudes require ADR and versioned config file"
+        ],
+        "title": "Implement packages/world price generator: 2 assets, 2 noise layers, O(1) at any tick",
+        "why_now": "FASE-1 requires a price generator covering at least two assets (ORB and NEXA) with two octave layers of fractal noise. With packages/core in place this becomes buildable. The trendLayer and idiosyncraticNoise must be positional so price(asset, tick) is O(1) and yields the same value whether reached directly or tick-by-tick, satisfying INV-02. Octave count, periods, and amplitudes are DEFINIR items requiring an ADR before any numbers are embedded in the engine."
+      },
+      {
+        "acceptance_targets": [
+          "Account, Entry, Transaction types with commodity declaration enforced at compile time; Entry without commodity is a type error",
+          "All mandatory accounts defined as constants; no string literals for account names outside a registry",
+          "Market-order execution for spot buy and sell producing correct multi-commodity double-entry transactions with causationId",
+          "Taker fee computed on notional and posted to venue:fees; rounding residue posted to world:rounding_residue:<COMMODITY>",
+          "INV-04 test: per-commodity sum of every Entry in every Transaction is exactly zero, property-tested over 1000 random buy/sell sequences",
+          "INV-05 test: sum of all BRL account balances is exactly zero after any sequence of spot trades",
+          "INV-06 test: sum of all asset quantity balances is exactly zero after any sequence of spot trades",
+          "INV-07 test: rounding residue in world:rounding_residue equals the exact accumulated truncation difference"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 — Ledger, dupla entrada, Transaction, Entry, Account, commodity declaration enforced at type level",
+          "§7 — canonical tick order; market orders, fills, taker fees in venue:fees",
+          "§4 — mandatory account names: player:cash:BRL, player:spot:<ASSET>, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, venue:fees",
+          "INV-04 — per-commodity sum of every Entry in every Transaction is exactly zero",
+          "INV-05 — sum of all BRL account balances is zero every tick",
+          "INV-06 — sum of all asset quantity balances is zero every tick",
+          "INV-07 — rounding residue fully accounts for accumulated truncation difference",
+          "§3 ADR-004 — explicit rounding mode on every division; causationId on every Transaction"
+        ],
+        "title": "Implement packages/domain: double-entry ledger, spot market orders, INV-04 through INV-07",
+        "why_now": "FASE-1 requires a multi-commodity double-entry ledger and market-order execution for spot buy and sell. Without these, the canonical tick loop and save/replay cannot be tested end-to-end, and INV-04 through INV-07 remain unverifiable. The ledger is the economic core that all gameplay depends on. rounding residue correctness (INV-07) and per-commodity balance closure (INV-04, INV-05, INV-06) are not testable until domain is implemented."
+      },
+      {
+        "acceptance_targets": [
+          "Canonical 10-step tick loop implemented in packages/application as a single readable sequence; test verifies step ordering by checking that a price computed in step 1 is visible in step 4 liquidation check, not before",
+          "Save file written and read in ADR-006 format; loading a save where finalTick < max(action.tick) fails with an explicit error rather than silently repairing",
+          "Loading a save with a duplicate (tick, sequence) pair fails with an explicit error",
+          "tools/replay CLI accepts two save files and reports the first tick where StateHash diverges, exiting nonzero on divergence",
+          "INV-01 test: StateHash from live session equals replay StateHash at every tick for a reference game",
+          "INV-21 test: save validation rejects invalid finalTick and duplicate (tick,sequence) pairs",
+          "Three reference game saves committed; CI replay comparison passes for all three"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003",
+          "IDEA-004"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§7 — 10-step canonical tick order, TRAVADO, must be implemented in one place and testable for ordering",
+          "§3 ADR-006 — save file: specVersion, rulesetVersion, encodingVersion, masterSeed, finalTick, actions array",
+          "INV-01 — replay of save produces identical StateHash as live session at every tick",
+          "INV-21 — finalTick >= max(action.tick); (tick,sequence) pair unique in log",
+          "INV-12 — no identifier depends on external entropy",
+          "§15 FASE-1 acceptance: CLI de replay, loop de tick, save com seed e log de ações",
+          "§17 CI gate item 5 — replay of three reference games with StateHash comparison per tick"
+        ],
+        "title": "Implement tick loop, save/load (ADR-006), and tools/replay CLI",
+        "why_now": "FASE-1 requires the canonical 10-step tick processing order implemented in a single readable location in packages/application, a save file conforming to ADR-006 (seed + action log + finalTick), and a tools/replay CLI that compares two executions and reports the first divergent tick. Without these, INV-01 (replay purity) and INV-21 (finalTick invariant) cannot be verified, and the §17 CI gate requiring three reference-game replay comparisons cannot be satisfied. These are the capstone deliverables that validate end-to-end FASE-1 correctness."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo bootstrap is complete (TASK-0002 accepted): all 16 mandated npm workspaces exist, strict TypeScript configuration, ESLint determinism-enforcement rules, dependency boundary checker, CI workflow, and 44 passing tests for lint/boundary/config are in place. Every package source file is a stub `export {}`. No ADRs have been written, no production logic exists, and no invariant tests are present.",
+      "highest_priority_gap": "packages/core has zero implementation and zero ADRs. The spec explicitly requires ADR-009 (CanonicalEncoder) to be written and the encoder implemented before any StateHash can exist. The hash function for ADR-002 is DEFINIR and must be registered in an ADR before rand() is implemented. No nominal types, no RNG, no hash, and no canonical encoding means every other FASE-1 deliverable is blocked."
+    },
+    "warnings": [
+      "ADR-009 is an explicit prerequisite gating all StateHash work: the spec states the encoder must be implemented before any StateHash exists. Any implementation that produces a hash before ADR-009 is recorded is a direct spec violation.",
+      "The hash function for ADR-002 is DEFINIR. Implementing rand() before registering the algorithm bit-by-bit in an ADR embeds an unregistered number with determinism effect, violating §19 and §16 item 7.",
+      "ADR-004 rounding enforcement mechanism is DEFINIR. Domain arithmetic written before this ADR exists cannot satisfy the compile-time or lint-time enforcement the spec requires.",
+      "tools/bench calibration ratios must be frozen in FASE-1 (§18 baseline protocol). These ratios cannot be frozen until packages/core and packages/world are implemented. bench work is sequentially blocked by IDEA-001 and IDEA-003 but must not be deferred past FASE-1 acceptance.",
+      "The transcendental-function prohibition in §13 combined with the price generator's need for logarithmic and exponential operations creates an implementation constraint: fixed-point or lookup-table implementations of these functions must be specified before packages/world arithmetic is written, and the approach should be captured in an ADR."
+    ]
+  }
+}

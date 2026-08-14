@@ -1,0 +1,84 @@
+{
+  "created_at": "2026-08-14T01:42:33.052932+00:00",
+  "cycle_id": "CYCLE-000032",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "Accept a reduced, reviewable slice of IDEA-001. ADR-009 and CanonicalEncoder are the earliest foundational requirement because the specification explicitly requires them before any StateHash implementation. Combining all core primitives, three ADRs, RNG, arithmetic, and invariant suites would be too large for one engineering change.",
+    "risks": [
+      "An underspecified ADR could create cross-runtime encoding ambiguity; golden byte vectors must lock the accepted format.",
+      "Recursive or cyclic inputs could cause nondeterministic failure unless their treatment is explicitly defined by ADR-009.",
+      "Unordered-collection sorting can accidentally depend on locale or runtime behavior; sorting must operate on canonical bytes."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "ADR-009 exists and specifies the byte-level encoding sufficiently for an independent implementation to reproduce identical bytes.",
+        "CanonicalEncoder produces byte-identical output for logically equal supported values regardless of object property insertion order.",
+        "CanonicalEncoder produces different bytes for values differing by supported scalar type, scalar value, collection semantics, or encodingVersion.",
+        "Object keys are ordered by their UTF-8 byte sequences, not locale-sensitive comparison.",
+        "Bigints use the ADR-defined signed decimal ASCII representation and cannot collide with safe-integer encodings.",
+        "Safe integers have a distinct marker and values outside the safe-integer range are rejected.",
+        "undefined, NaN, positive or negative Infinity, negative zero, and unsupported values fail with explicit deterministic errors.",
+        "Ordered collections preserve element order; unordered collections encode independently of insertion order under the ADR-defined rule.",
+        "No StateHash implementation is introduced before this task is accepted.",
+        "Repository lint, TypeScript checks, dependency-boundary checks, and the full existing test suite pass."
+      ],
+      "cycle_id": "CYCLE-000032",
+      "must_preserve": [
+        "Strict TypeScript configuration and existing workspace boundaries.",
+        "Existing determinism restrictions, including no floating-point simulation arithmetic, Math.random, Date, or external entropy.",
+        "All currently passing bootstrap, lint, configuration, and dependency-boundary tests.",
+        "The specification rule that finalTick is excluded from StateHash; this task must not introduce StateHash."
+      ],
+      "objective": "Record ADR-009 and implement the deterministic CanonicalEncoder required before StateHash work may begin.",
+      "out_of_scope": [
+        "StateHash implementation or hashing encoded state.",
+        "Positional RNG and ADR-002.",
+        "Branded Money, Quantity, Price, Rate, and Tick types.",
+        "Division helpers and ADR-004.",
+        "World price generation, ledger logic, tick processing, replay, Electron, installers, and benchmarks.",
+        "Any modification to CICLO_SPEC.md."
+      ],
+      "required_adrs": [
+        "ADR-009: specify the complete CanonicalEncoder format, supported value domain, type markers, UTF-8 key ordering, bigint and safe-integer representations, prohibited values, ordered versus unordered collection rules, and encodingVersion participation."
+      ],
+      "required_tests": [
+        "Golden-byte tests for every supported scalar and collection form specified by ADR-009.",
+        "Property-insertion-order test proving logically equal objects produce identical canonical bytes.",
+        "UTF-8 key-order tests covering ASCII and non-ASCII keys.",
+        "Type-separation tests proving bigint, safe integer, string, and other supported scalar encodings cannot collide.",
+        "Rejection tests for undefined, NaN, both infinities, negative zero, unsafe integers, and unsupported values.",
+        "Ordered-collection permutation test proving order affects bytes.",
+        "Unordered-collection permutation test proving insertion order does not affect bytes.",
+        "encodingVersion test proving a version change affects canonical bytes.",
+        "Run the repository's complete test, lint, typecheck, and boundary-validation commands."
+      ],
+      "scope": [
+        "Write ADR-009 before or alongside dependent implementation.",
+        "Implement CanonicalEncoder in packages/core according to the accepted ADR.",
+        "Define canonical UTF-8 byte ordering for object keys.",
+        "Define unambiguous encodings for bigint and safe integers, including distinct type markers.",
+        "Reject undefined, NaN, Infinity, negative zero, unsafe integers, and every unsupported value.",
+        "Define and implement distinct handling for ordered and unordered collections.",
+        "Include encodingVersion in the canonical encoded representation.",
+        "Add focused exports and tests within packages/core only."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §3 ADR-009",
+        "CICLO_SPEC.md §14.4 packages/core scope",
+        "CICLO_SPEC.md §15 FASE-1 acceptance and ADR-009 prerequisite",
+        "CICLO_SPEC.md §19 DEFINIR decision discipline",
+        "INV-22 canonical-byte equality requirement",
+        "BENCHMARK.md task scope and validation requirements"
+      ],
+      "task_id": "TASK-0003",
+      "title": "Define and implement canonical state encoding"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0003",
+  "title": "Define and implement canonical state encoding"
+}
