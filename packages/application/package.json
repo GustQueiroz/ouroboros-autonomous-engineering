@@ -1,0 +1,13 @@
+{
+  "name": "@ciclo/application",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@ciclo/contracts": "0.0.0",
+    "@ciclo/domain": "0.0.0",
+    "@ciclo/narrative": "0.0.0",
+    "@ciclo/world": "0.0.0"
+  }
+}

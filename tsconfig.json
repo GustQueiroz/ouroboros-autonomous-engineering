@@ -1,0 +1,20 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/contracts" },
+    { "path": "./packages/world" },
+    { "path": "./packages/domain" },
+    { "path": "./packages/narrative" },
+    { "path": "./packages/application" },
+    { "path": "./packages/adapters" },
+    { "path": "./packages/ui" },
+    { "path": "./apps/desktop/main" },
+    { "path": "./apps/desktop/preload" },
+    { "path": "./apps/desktop/renderer" },
+    { "path": "./apps/desktop/simulation-worker" },
+    { "path": "./tools/replay" },
+    { "path": "./tools/bench" },
+    { "path": "./tools/package" }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "attempt": 3,
+  "created_at": "2026-08-14T01:02:13.505505+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "changed_files": [
+      "tools/boundary/graph.mjs",
+      "tools/boundary/lib.mjs",
+      "tests/boundary/graph.test.mjs"
+    ],
+    "findings": [
+      {
+        "finding_id": "REVIEW-001",
+        "resolution": "In tools/boundary/graph.mjs, isDirectEdgeAllowed no longer short-circuits to true when sourceNode === targetNode; it now only returns true when targetNode is in DIRECT_EDGES[sourceNode]. Because §14.5 declares no apps→apps or tools→tools direct edge, cross-workspace imports between distinct workspaces sharing the same architecture node (e.g., desktop-main → desktop-preload, tools-replay → tools-bench) now produce a violation. In tools/boundary/lib.mjs the `if (target.node === ws.node && target.kind === 'package') continue;` bypass was removed; same-workspace imports remain allowed via the pre-existing `target.pkgName === ws.pkgName` short-circuit, which covers both self-package specifiers and intra-workspace relative imports. Added tests in tests/boundary/graph.test.mjs: (a) graph-level assertions that apps/tools/core/domain self-edges are rejected; (b) rejection of `@ciclo/desktop-main` importing `@ciclo/desktop-preload`; (c) rejection of relative `apps/desktop/renderer` → `apps/desktop/simulation-worker`; (d) rejection of `@ciclo/tools-replay` importing `@ciclo/tools-bench`; (e) rejection of relative tools-replay → tools-package; (f) acceptance of a package self-import inside the same workspace. Declared direct edges (domain→core, application→domain, adapters→application, ui→contracts, apps→adapters, etc.) remain accepted by the existing positive tests plus the committed-repository sweep, which continues to pass.",
+        "status": "RESOLVED"
+      }
+    ],
+    "notes_for_reviewer": [
+      "The fix intentionally rejects same-node cross-workspace imports for both `apps` and `tools`, matching the review's explicit instruction not to invent tools dependency permissions where §14.5 leaves them unresolved. If future §14.5 clarification introduces an intra-node edge (e.g., apps→apps), it would need to be added explicitly to DIRECT_EDGES.",
+      "Intra-workspace imports (both relative and self-package specifier) remain permitted via the pre-existing `target.pkgName === ws.pkgName` short-circuit in tools/boundary/lib.mjs; a new positive test locks that behavior in.",
+      "Violation reason strings were expanded to distinguish same-node cross-workspace edges from cross-node undeclared edges, aiding future debugging without changing pass/fail semantics."
+    ],
+    "remaining_issues": [],
+    "review_iteration": 2,
+    "status": "COMPLETED",
+    "summary": "Fixed the boundary checker to distinguish workspace identity from architecture-node identity: removed the same-node auto-allow bypass in tools/boundary/lib.mjs and the implicit self-edge in tools/boundary/graph.mjs::isDirectEdgeAllowed. Same-workspace imports (relative or self-package) remain accepted via the existing pkgName equality check. Added six negative tests covering package and relative imports between distinct same-node app workspaces (desktop-main/preload, renderer/simulation-worker) and same-node tool workspaces (tools-replay/bench, tools-replay/package), plus a positive same-workspace self-package import test and a graph-level test asserting that apps/tools/core/domain do not have implicit self-edges. §14.5 direct edges (apps→adapters, apps→contracts, apps→ui, etc.) remain unchanged; no tools dependency permissions were invented.",
+    "task_id": "TASK-0002",
+    "validation": [
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary: OK. 15 workspace packages validated against §14.5."
+      },
+      {
+        "command": "npm run test",
+        "result": "PASS",
+        "summary": "44/44 tests pass (config, lint, and boundary suites), including all six new same-node cross-workspace boundary tests."
+      },
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json exits 0 across all 15 TypeScript workspaces."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . exits 0 with no warnings or errors."
+      }
+    ]
+  },
+  "task_id": "TASK-0002"
+}

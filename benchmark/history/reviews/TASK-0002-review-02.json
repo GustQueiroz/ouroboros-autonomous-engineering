@@ -1,0 +1,104 @@
+{
+  "created_at": "2026-08-14T00:59:30.954790+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "The root package.json declares npm workspaces for all 16 mandated directories, and each directory exists with valid workspace metadata.",
+        "evidence": "package.json lists exactly the 16 required workspace paths; the candidate contains package.json metadata for each path, and configuration test 14 passes.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "A committed package-lock.json is present, and npm ci succeeds from a clean checkout in the authoritative validation environment.",
+        "evidence": "Candidate includes package-lock.json; automated dependency-install ran npm ci --no-audit --no-fund with exit code 0.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No pnpm-workspace.yaml, pnpm-lock.yaml, pnpm shim, pnpm packageManager declaration, or pnpm invocation exists in repository-controlled configuration, scripts, source, or CI.",
+        "evidence": "No pnpm artifact or invocation appears in the candidate diff; package.json has no packageManager entry, and CI uses npm. Configuration tests 17-19 pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The exact root commands npm run compile, npm run lint, npm run boundary, and npm run test each exit 0 after npm ci.",
+        "evidence": "Implementer reports the exact four commands exited 0 after a clean npm ci; automated validation independently confirms npm ci, lint, and test. The compile graph consists of the 15 referenced placeholder TypeScript projects, and the reported boundary output validates all 15.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Every TypeScript workspace configuration extends the shared base configuration, and the effective configuration enables strict and noUncheckedIndexedAccess.",
+        "evidence": "All 15 TypeScript workspace tsconfig files extend tsconfig.base.json, which sets strict and noUncheckedIndexedAccess to true; tests 10-11 pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "TypeScript source discovery and relevant gates cover .ts, .tsx, .mts, and .cts files.",
+        "evidence": "Every project include list and the boundary SOURCE_EXTENSIONS cover all four extensions; tests 12 and the .mts/.cts lint tests pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The pure-package lint restrictions apply to all four TypeScript extensions under packages/; any exception is confined to packages/adapters or packages/ui as allowed by the specification.",
+        "evidence": "PURE_PACKAGE_EXTENSIONS contains ts, tsx, mts, and cts; override globs are limited to adapters and ui. Negative and positive lint fixtures pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The boundary checker rejects forbidden direct cross-workspace imports, including relative cross-workspace imports, while permitting only direct edges declared by §14.5 and not treating transitive reachability as permission.",
+        "evidence": "tools/boundary/lib.mjs explicitly skips package imports when target.node equals ws.node, and isDirectEdgeAllowed in graph.mjs returns true whenever sourceNode equals targetNode. Consequently, imports between distinct app workspaces or between distinct tool workspaces are accepted despite no corresponding direct workspace edge being declared. The tests cover cross-node violations only.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "CI uses npm ci and runs compile, lint, boundary, and test successfully against committed state.",
+        "evidence": ".github/workflows/ci.yml uses npm ci and invokes all four exact root scripts without conditional flags.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "SPEC_BLOCKERS.md exists with the fields required by §19 and does not record a fabricated resolution.",
+        "evidence": "SPEC_BLOCKERS.md defines identifier, status, conflict sections, impact, affected work fronts, origin, provisional decision, and resolution fields; it records no resolution.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No production algorithm, economic behavior, or behavior dependent on an unresolved DEFINIR item is introduced.",
+        "evidence": "All workspace production sources are empty export placeholders; changes are limited to bootstrap configuration, validation tooling, tests, and documentation.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "In tools/boundary/lib.mjs, `if (target.node === ws.node && target.kind === 'package') continue;` bypasses validation for imports such as desktop-main to desktop-preload. Relative imports get the same result because tools/boundary/graph.mjs makes isDirectEdgeAllowed return true for every identical source and target node. These are distinct workspaces, but §14.5 declares no direct app-to-app or tool-to-tool edge. Existing boundary tests exercise only workspaces represented by different graph nodes and therefore do not expose this bypass.",
+        "id": "REVIEW-001",
+        "required_change": "Validate workspace identity separately from architecture-node identity: allow imports within the same workspace, but do not automatically allow imports into a distinct workspace merely because both map to `apps` or `tools`. Add negative tests for both package-specifier and relative imports between distinct same-node workspaces, while preserving the explicitly declared direct edges. Do not invent tools dependency permissions where §14.5 is unresolved.",
+        "severity": "MAJOR",
+        "title": "Boundary checker allows undeclared same-node cross-workspace imports"
+      }
+    ],
+    "invariants_checked": [
+      "npm-only package-management foundation",
+      "All 16 mandated workspace directories and metadata",
+      "Strict and noUncheckedIndexedAccess TypeScript inheritance",
+      "Four-extension TypeScript discovery",
+      "Pure-package lint coverage and authorized exception locations",
+      "Direct-edge architecture semantics",
+      "Relative cross-workspace import enforcement",
+      "No production domain or economic behavior",
+      "No replay, ledger, arithmetic, rounding, RNG, encoding, or state-hash behavior introduced",
+      "No fabricated ADR or DEFINIR resolution",
+      "CI gate composition",
+      "Deterministic pinned development dependencies"
+    ],
+    "risks": [
+      "Future code could create undeclared coupling between desktop process workspaces without failing the boundary gate.",
+      "The same bypass silently assigns tool-to-tool dependency permission despite the task explicitly leaving tools dependency rules unresolved."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The monorepo bootstrap largely satisfies the task, but the boundary checker permits undeclared cross-workspace imports between workspaces mapped to the same architecture node. This violates the required direct-edge-only semantics and lacks negative test coverage.",
+    "task_id": "TASK-0002",
+    "validation_assessment": {
+      "missing": [],
+      "sufficient": true
+    }
+  },
+  "review_iteration": 2,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0002"
+}

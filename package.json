@@ -1,0 +1,39 @@
+{
+  "name": "ciclo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CICLO monorepo root",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/world",
+    "packages/domain",
+    "packages/application",
+    "packages/narrative",
+    "packages/contracts",
+    "packages/adapters",
+    "packages/ui",
+    "apps/desktop/main",
+    "apps/desktop/preload",
+    "apps/desktop/renderer",
+    "apps/desktop/simulation-worker",
+    "tools/replay",
+    "tools/bench",
+    "tools/package",
+    "docs/decisions"
+  ],
+  "scripts": {
+    "compile": "tsc -b tsconfig.json",
+    "lint": "eslint --max-warnings=0 .",
+    "boundary": "node tools/boundary/check.mjs",
+    "test": "node --test \"tests/config/*.test.mjs\" \"tests/lint/*.test.mjs\" \"tests/boundary/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "8.15.0",
+    "eslint": "9.15.0",
+    "typescript": "5.6.3"
+  }
+}
