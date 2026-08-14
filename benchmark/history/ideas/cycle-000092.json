@@ -1,0 +1,160 @@
+{
+  "created_at": "2026-08-14T10:57:06.898674+00:00",
+  "cycle_id": "CYCLE-000092",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Branded nominal types Money, Quantity, Price, Rate exported as bigint with type tag; Tick exported as safe-integer number with type tag; all validator constructors reject non-integer, non-bigint (for monetary), out-of-range, NaN, Infinity, -0",
+          "Scale constants exported: QUANTITY_SCALE = 100_000_000n, PRICE_SCALE = 10_000n, RATE_SCALE = 100_000_000n",
+          "mulDiv(a: bigint, b: bigint, divisor: bigint, mode: RoundingMode): bigint helper with TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN; rounding mode is a required parameter — calling without it is a TypeScript compile error",
+          "residue(nominalCents: bigint, truncatedCents: bigint): bigint helper for rounding residue accounting",
+          "ADR written (docs/decisions/NNNN-rounding-mode-enforcement.md) documenting that ADR-004 DEFINIR is resolved by required-parameter API: the helper signature enforces the declaration at compile time with no lint rule needed",
+          "INV-23 property test: 525,600 tick replay accumulation using the arithmetic helpers produces no safe-integer overflow on Tick values",
+          "All additions pass lint: no float literals, no transcendental Math, no Math.random, no console"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "§4 domain glossary",
+          "INV-23",
+          "§13 lint prohibitions",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Complete packages/core: nominal types, scale constants, and arithmetic helpers",
+        "why_now": "packages/core currently exports only the CanonicalEncoder. FASE-1 scope requires 'aritmética inteira, ponto fixo, hash, rng posicional' as core-complete. Nominal branded types (Money, Quantity, Price, Rate, Tick) and bigint arithmetic helpers with explicit rounding modes are prerequisites for both packages/world and packages/domain — neither can be implemented in a type-safe, lint-clean way without them. These items carry no unresolved DEFINIR dependencies for the types themselves; ADR-004 only leaves open how rounding-mode enforcement is imposed technically, which can be resolved by a small ADR documenting that the helper API enforces it via required-parameter type signatures. This unblocks the two largest remaining FASE-1 work fronts."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written (docs/decisions/NNNN-hash-function.md) specifying the hash function bit-by-bit: FNV-1a accumulation of all arguments (masterSeed as string, namespace as string, each coordinate as safe integer) into a 64-bit state, then one round of SplitMix64 finalisation; result taken as the lower 53 bits to stay within safe-integer range",
+          "At least five test vectors in the ADR: known (masterSeed, namespace, coordinate) inputs and their expected uint53 outputs, computed by a reference implementation and recorded verbatim",
+          "ADR confirms the function is not the native language/runtime hash (no Symbol.hash, no V8 hash), satisfies INV-19 bit-identity requirement, and uses only integer arithmetic allowed under ADR-003",
+          "rand(masterSeed: string, namespace: string, ...coordinates: number[]): number implemented in packages/core as a pure function with no mutable state, no Math.random, no Date",
+          "Unit tests verify all ADR test vectors exactly",
+          "Property test: rand output with the same arguments always equals itself regardless of call order or call count (statelessness proof)",
+          "All core sources pass lint after addition"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-03",
+          "INV-12",
+          "INV-19",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Write hash function ADR and implement rand() positional RNG in packages/core",
+        "why_now": "ADR-002 marks the hash function as DEFINIR with the recommendation of SplitMix64 over an FNV-1a accumulator. No ADR exists for this. Without a bit-exact hash function specification (including test vectors) and a working rand(masterSeed, namespace, ...coordinates) -> uint64 implementation, packages/world cannot generate prices, INV-02 (direct tick query equals tick-by-tick traversal) cannot be tested, and INV-03 (player actions do not alter worldPrice) has no surface to verify. This is the second of two core completions required before any world or domain logic can be tested against invariants."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written (docs/decisions/NNNN-market-generator-params.md) specifying octave count, periods, and amplitudes for trendLayer and idiosyncraticNoise; parameters stored in a versioned config file; changing any parameter invalidates the spec compatibility hash",
+          "price(assetId: string, tick: Tick): Price implemented as a pure positional function using rand() from core; no mutable state; no OHLC at the base level",
+          "Two assets implemented: ORB (blue chip, low volatility) and one additional archetype from the FASE-1 list",
+          "Fractal noise: at least two octaves per asset; each octave samples rand() at block vertices and interpolates in fixed-point (no Math.sin, no Math.exp, no float literals)",
+          "INV-02 test: price(asset, 525600) equals the result of stepping tick-by-tick from 0 to 525600, checked for both assets",
+          "INV-03 test: two calls to price() with different playerImpact inputs leave worldPrice series byte-identical",
+          "All world sources pass lint; boundary checker still passes (world imports only core)"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1",
+          "ADR-002",
+          "ADR-003",
+          "ADR-005",
+          "INV-02",
+          "INV-03",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Implement packages/world: deterministic price generator with two noise octaves and two assets",
+        "why_now": "With core complete (nominal types + rand()), packages/world is the next FASE-1 deliverable. The price generator is the spec's most important determinism surface: INV-02 requires that price(asset, t) accessed directly equals the value produced by stepping tick-by-tick from 0 to t, for any t and any asset. This test is singled out by the spec as 'o teste mais importante do projeto'. INV-03 requires that different player action logs on the same seed produce identical worldPrice series. Neither invariant can be green without a working price generator. An ADR must also resolve the DEFINIR for octave count, periods, and amplitudes before the generator is coded."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction type with per-commodity zero-sum enforcement; construction of a Transaction that leaves any commodity unbalanced is a TypeScript compile error, not a runtime check",
+          "All minimum accounts defined as typed constants; posting to an unlisted account string is a type error",
+          "Market buy and sell (spot) order execution: notional computed in bigint via mulDiv, maker/taker fee deducted and posted to venue:fees, rounding residue captured and posted to world:rounding_residue:<COMMODITY>, all in a single atomic Transaction",
+          "INV-04 enforced as a runtime assertion on every Transaction commit in addition to the type-level constraint",
+          "Property test: 1000 random buy/sell sequences using randomised quantities preserve INV-05 (BRL sum = 0) and INV-06 (asset sum = 0)",
+          "INV-07 property test: sum of rounding residue entries equals exact difference between nominal and truncated total, per commodity, across the sequence",
+          "All domain sources pass lint; boundary checker still passes (domain imports only core)"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§6",
+          "§7 steps 5–6",
+          "ADR-003",
+          "ADR-004",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-13",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Implement packages/domain: multi-commodity double-entry ledger and spot market orders",
+        "why_now": "The ledger is the FASE-1 economic core. INV-04 (per-commodity zero-sum on every Transaction), INV-05 (BRL sum across all accounts is always zero), INV-06 (asset quantity sum across all accounts is always zero), and INV-07 (rounding residue fully accounts for all truncation by commodity) all live in domain. Without a working ledger and market order execution path, there is no economic state to hash, no save to replay, and no INV-01 to test. All required accounts (player:cash:BRL, player:spot:<ASSET>, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, venue:fees) must exist and be enforced as the only valid mutation path."
+      },
+      {
+        "acceptance_targets": [
+          "Electron version pinned in a versioned config file; electron-builder configuration targets Windows (NSIS installer) and Linux (AppImage); CI produces artefacts for both platforms",
+          "apps/desktop/main owns window lifecycle and filesystem; apps/desktop/simulation-worker runs application and domain logic in a Worker thread; apps/desktop/renderer is presentation-only",
+          "packages/contracts exports typed IPC message schemas; preload exposes only named channels via contextBridge (no generic invoke(channel, args) pattern)",
+          "Electron security config in main: contextIsolation:true, nodeIntegration:false, sandbox:true — INV-29 automated test reads BrowserWindow config and asserts all three flags in all modes including development",
+          "Minimal renderer: lightweight-charts price chart wired to worldPrice stream from worker, BRL balance display, buy and sell buttons that post MarketOrder messages to worker, pause and 1x speed controls",
+          "Permanent non-dismissable disclaimer in the UI per §20 (simulação com ativos inexistentes, dinheiro fictício, não constitui recomendação de investimento)",
+          "INV-26 boundary: ui imports only contracts; simulation-worker imports application and domain, never electron or node:fs directly; main owns I/O"
+        ],
+        "category": "architecture",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.1",
+          "§14.2",
+          "§14.6",
+          "INV-26",
+          "INV-29",
+          "§20",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Electron scaffold: simulation worker, typed IPC, minimal UI, and CI installer build",
+        "why_now": "The spec states explicitly: 'Instalador mínimo para Windows e Linux produzido pelo CI, ainda que a aplicação faça pouco' and 'Instalador que abre uma janela vazia na FASE-1 vale mais que instalador perfeito na FASE-7.' The rationale is that packaging problems (native module ABI, platform-specific paths, electron-builder config, Electron version pinning) discovered late are architectural problems that cannot be fixed locally. INV-29 (contextIsolation, nodeIntegration:false, sandbox in all modes) requires automated verification. The simulation-worker/renderer separation is TRAVADA: renderer must never simulate, simulation must run in a dedicated worker. Delaying this risks compounding all of these problems into the final phase when domain work is complete and there is no time to redesign the process boundary."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo infrastructure is complete: TypeScript project references, ESLint determinism lint with fixture tests, package boundary checker with full test coverage, and CI pipeline with four gates. packages/core exports the CanonicalEncoder (implemented, ADR-009 written and accepted in CYCLE-000090). All other packages (world, domain, application, contracts, narrative, adapters, ui) and all tools (replay, bench, package) remain as empty stubs (export {}). No Electron window, no installer, no ADR for the hash function or rounding mode enforcement.",
+      "highest_priority_gap": "packages/core is incomplete: nominal branded types (Money, Quantity, Price, Rate, Tick), scale constants, bigint arithmetic helpers with explicit rounding modes, and the positional RNG rand() are all absent. These are the sole dependency of every other FASE-1 package and must exist before packages/world (price generator) or packages/domain (ledger) can be implemented or tested against their invariants."
+    },
+    "warnings": []
+  }
+}

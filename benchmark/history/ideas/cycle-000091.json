@@ -1,0 +1,138 @@
+{
+  "created_at": "2026-08-14T10:52:46.639737+00:00",
+  "cycle_id": "CYCLE-000091",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR written and registered in docs/decisions/ specifying the hash function bit-by-bit with all argument encoding rules",
+          "rand(masterSeed: string, namespace: string, ...coordinates: number[]): number implemented as a pure function in packages/core with no stateful PRNG",
+          "Test demonstrating positional property: rand result at coordinate [9_000_000] equals the value produced by iterating through all prior coordinates",
+          "All lint rules for Math.random and external entropy already block misuse in pure packages",
+          "All 11 reserved namespaces from ADR-002 table are covered by documentation in the ADR"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002",
+          "§14.4 packages/core",
+          "INV-02",
+          "INV-12",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Hash function ADR and positional RNG implementation in packages/core",
+        "why_now": "rand(masterSeed, namespace, ...coordinates) is the single most blocking gap in packages/core. The price generator, macro event scheduler, and bot policy engine all depend on it. ADR-002 delegates the hash function choice to a DEFINIR that must be resolved by ADR before implementation; the spec already gives a concrete starting recommendation (SplitMix64 over FNV-1a of the arguments), making the ADR decision straightforward. No downstream FASE-1 deliverable can be built until this is in place."
+      },
+      {
+        "acceptance_targets": [
+          "Branded bigint types Money, Quantity, Price, Rate with constructor validators rejecting non-integer bigint values",
+          "Branded number type Tick with constructor validator rejecting non-safe-integer and non-monotonic values",
+          "Scale constants QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE exported from packages/core",
+          "Constructor for each type rejects values outside its domain at runtime, not just at the type level",
+          "Test verifying that 1n (bigint) and 1 (number) produce distinct branded types that do not unify"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003",
+          "§4 (glossary)",
+          "INV-13",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Nominal branded types for Money, Quantity, Price, Rate, and Tick in packages/core",
+        "why_now": "ADR-003 requires these types to be mechanically enforced by TypeScript; without them there is nothing preventing a Tick from being passed where a Money is expected, or a raw number from flowing through domain logic as a price. Every subsequent FASE-1 deliverable (ledger, order execution, price generator) will define its function signatures in terms of these types. Implementing them now lets the ledger and price generator be written correctly from the start rather than requiring a retrofit."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written resolving DEFINIR on enforcement mechanism (lint rule, type-level wrapper, or both)",
+          "divide(a: bigint, b: bigint, mode: RoundingMode): bigint helper in packages/core covering all three modes",
+          "divideInt(a: number, b: number, mode: RoundingMode): number equivalent for safe-integer paths",
+          "Lint rule or type-level barrier making bare / on branded economic types a compile-time or lint-time error",
+          "Test verifying residue from truncating division equals the difference between the truncated result and exact value"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-004",
+          "INV-07",
+          "§6 (rounding residue accounts)",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Arithmetic helpers with explicit rounding modes and ADR-004 enforcement mechanism",
+        "why_now": "ADR-004 forbids implicit division and requires every precision-losing operation to declare TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, or ROUND_HALF_EVEN. The enforcement mechanism is a DEFINIR that must be resolved by ADR before implementation; without it, division helpers exist but nothing prevents callers from using bare bigint division. Establishing this before the ledger and price generator are written avoids a retrofit across all financial calculations."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main bootstraps an Electron BrowserWindow with contextIsolation: true, nodeIntegration: false, sandbox: true",
+          "apps/desktop/preload exposes only a typed allowlist of IPC channels via contextBridge, no generic invoke channel",
+          "electron-builder configuration targets Windows NSIS and Linux AppImage in CI",
+          "CI job produces installer artifacts for both platforms on each passing commit",
+          "INV-29 automated test verifies the security flags in all configurations including development mode"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.2 (process topology)",
+          "§14.6 (packaging)",
+          "§15 FASE-1 Aceite",
+          "INV-29"
+        ],
+        "title": "Minimal Electron shell with correct security configuration and CI installer artifacts",
+        "why_now": "The spec contains a locked sequencing requirement: the installer exists in FASE-1, not at the end, because packaging failures (native module ABI, cross-platform path issues) discovered late are not locally correctable. FASE-1 acceptance explicitly requires a minimal installer for Windows and Linux produced by CI, and INV-29 (contextIsolation, nodeIntegration, sandbox) must be green. None of the simulation logic needs to be functional; a window that opens is sufficient and correct for this stage."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction, Entry, Account types with commodity declared on every Entry; missing commodity is a type error",
+          "All minimum accounts from §6 defined: world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, world:insurance_fund, player:cash:BRL, player:spot:<ASSET>, venue:fees, venue:funding, venue:realized_pnl, venue:liquidation_penalty",
+          "INV-04 test: for every transaction, sum of entries per commodity equals exactly zero",
+          "INV-05 test: sum of all BRL account balances is exactly zero after any sequence of transactions",
+          "INV-06 test: sum of all quantities for each asset is exactly zero after any sequence of transactions",
+          "Rounding residue is posted to world:rounding_residue:<COMMODITY> so INV-07 holds; no value disappears silently",
+          "Entries are immutable; correction only by compensating transaction"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 (ledger)",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-12",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Double-entry multi-commodity ledger in packages/domain",
+        "why_now": "The ledger is the core financial primitive that market order execution, the tick loop, and the save format all depend on. INV-04, INV-05, INV-06, and INV-07 are FASE-1 acceptance invariants that cannot be green without a working ledger. The minimum account set and transaction semantics are fully specified and unambiguous, making this implementable now that branded types and arithmetic helpers (IDEA-002, IDEA-003) establish the type foundation."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold, TypeScript build system, dependency boundary enforcer, determinism lint rules, CI pipeline, and CanonicalEncoder (ADR-009) are fully implemented and tested. All other packages (world, domain, application, narrative, contracts, adapters, ui) remain empty stubs. Eight tasks completed; no active task.",
+      "highest_priority_gap": "packages/core is missing its positional RNG (ADR-002), which requires a hash function ADR decision first; without rand(), the price generator, macro events, and bot policies cannot be implemented, blocking all further FASE-1 simulation work."
+    },
+    "warnings": [
+      "The price generator (required for FASE-1) depends on transcendental functions (sin, exp, log for logarithmic price space) that ADR-003 prohibits as floating-point. The spec requires implementing them in fixed-point or linear-interpolation lookup tables, and states this must be documented in an ADR. No ADR exists yet for this. The price generator implementation will be blocked until this DEFINIR is resolved — the ADR should be written before or in parallel with the price generator task, not after."
+    ]
+  }
+}
