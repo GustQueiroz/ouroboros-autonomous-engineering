@@ -1,0 +1,73 @@
+{
+  "created_at": "2026-08-14T05:11:51.047901+00:00",
+  "cycle_id": "CYCLE-000049",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase. CanonicalEncoder is an explicit prerequisite to StateHash and remains unaccepted due to three narrow review findings. Resolving those findings is the smallest coherent change that advances the phase without introducing later-phase work.",
+    "risks": [
+      "Incorrectly using a global visited set would reject legal shared references; detection must track only identities on the active traversal path.",
+      "Cleanup of active-path identities must occur on every success and error path to avoid false cycle reports.",
+      "Native or instance methods used during detection could execute hostile user code unless captured intrinsics are used consistently."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "Self-referential and mutually cyclic supported arrays, plain objects, and Sets throw CanonicalEncoderError with the exact code and message documented by ADR-009; no native RangeError or uncontrolled recursion escapes.",
+        "A repeated reference that is not on the active traversal path is accepted and produces the same canonical bytes as the equivalent duplicated-by-value structure.",
+        "An enumerable own getter or setter on a top-level plain object, nested plain object, or null-prototype plain object throws E_ACCESSOR_DESCRIPTOR without invoking the accessor.",
+        "Cycle detection, property-descriptor inspection, and traversal rely only on captured intrinsics and execute no user getter, setter, iterator override, or coercion hook.",
+        "All 157 pre-existing tests and all new focused tests pass.",
+        "The exact candidate state passes the repository lint, strict compile/typecheck, and dependency-boundary commands.",
+        "No StateHash or SaveHash implementation is added."
+      ],
+      "cycle_id": "CYCLE-000049",
+      "must_preserve": [
+        "Canonical byte equality for logically equal supported acyclic values regardless of construction order.",
+        "Existing canonical ordering and encoding behavior for every supported acyclic type.",
+        "Existing accessor rejection and no-user-code-execution guarantees.",
+        "All accepted monorepo architecture and dependency boundaries.",
+        "The prohibition on StateHash implementation before CanonicalEncoder acceptance."
+      ],
+      "objective": "Complete ADR-009 and CanonicalEncoder cycle/accessor handling, then provide reproducible evidence that every repository gate passes.",
+      "out_of_scope": [
+        "StateHash or SaveHash implementation.",
+        "Positional RNG, numeric branded types, division helpers, Electron scaffolding, UI, replay, or later FASE-1 features.",
+        "Support for cyclic graphs through reference serialization.",
+        "Changes to CICLO_SPEC.md."
+      ],
+      "required_adrs": [
+        "ADR-009 must explicitly specify the stable cyclic-container error contract and state that repeated references outside the active traversal path are encoded by value rather than rejected."
+      ],
+      "required_tests": [
+        "Direct self-cycle tests for Array, plain object, null-prototype object, and Set.",
+        "Indirect multi-container cycle tests, including cycles crossing at least two supported container kinds.",
+        "Non-cyclic shared-reference test proving encode-by-value semantics.",
+        "Top-level, nested, and null-prototype plain-object accessor tests asserting E_ACCESSOR_DESCRIPTOR and zero getter/setter invocations.",
+        "Hostile overridden iterator/intrinsic tests applicable to the new cycle paths.",
+        "Run and record the existing complete test suite, lint command, npm run compile, and npm run boundary on the same candidate revision."
+      ],
+      "scope": [
+        "Update ADR-009 to define cyclic-container rejection and non-cyclic shared-reference behavior.",
+        "Detect active-path cycles in supported arrays, plain objects, and Sets and reject them through CanonicalEncoderError with one documented stable code and message.",
+        "Ensure cycle detection and descriptor inspection use captured intrinsics and do not invoke user code.",
+        "Add hostile tests for enumerable own accessors on top-level, nested, and null-prototype plain objects.",
+        "Capture validation results for lint, tests, strict compilation, and dependency-boundary checks on the exact candidate state."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §3 ADR-009 — CanonicalEncoder",
+        "CICLO_SPEC.md §12 INV-13 — explicit iteration order",
+        "CICLO_SPEC.md §12 INV-22 — canonical-byte equality",
+        "CICLO_SPEC.md §15 FASE-1 — ADR-009 and CanonicalEncoder before StateHash",
+        "CICLO_SPEC.md §19 — contradiction and blocker protocol"
+      ],
+      "task_id": "TASK-0006",
+      "title": "Close CanonicalEncoder review blockers"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0006",
+  "title": "Close CanonicalEncoder review blockers"
+}
