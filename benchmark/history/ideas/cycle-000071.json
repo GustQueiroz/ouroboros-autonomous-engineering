@@ -1,0 +1,133 @@
+{
+  "created_at": "2026-08-14T07:50:05.495551+00:00",
+  "cycle_id": "CYCLE-000071",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Every mutable built-in property used during encoding (Number.MAX_SAFE_INTEGER, Number.NaN, Number.isNaN, Number.isFinite, Number.isInteger, Number.isSafeInteger, Object.is, Array.isArray, Reflect.apply, Object.getOwnPropertyDescriptors, and all Set/Map prototype references) is captured into module-scope constants at initialization, before any exported function executes",
+          "ADR-009 states a single consistent policy on Set subclasses — either rejected with E_INVALID_SET_INSTANCE or admitted through the proven intrinsic path — with no contradictory clause in any section",
+          "Focused monkeypatch regression tests install accessors or replacement functions on each captured intrinsic after import and verify that encoding a non-trivial input that actually reaches the affected code path completes identically and invokes the accessor zero times",
+          "Evidence section includes verbatim captured stdout and exit code for npm run compile and npm run boundary on the exact submitted candidate, alongside lint and full test output"
+        ],
+        "category": "bug",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-009 — CanonicalEncoder",
+          "§12 INV-22 — canonical encoding determinism",
+          "§15 FASE-1 acceptance — ADR-009 written and encoder implemented before any state hash"
+        ],
+        "title": "Correct CanonicalEncoder intrinsic capture, ADR-009 consistency, and evidence completeness",
+        "why_now": "Three consecutive review rejections (TASK-0004, TASK-0005, TASK-0006) all cite the identical two blockers: mutable ambient built-ins read at encoding time rather than captured at module initialization, and missing independently captured npm run compile and npm run boundary output. A focused fix of these two issues, plus resolving the ADR-009 internal contradiction on Set subclasses and ensuring monkeypatch tests actually reach the patched code paths, is the minimum work required to unblock FASE-1. Nothing else in FASE-1 can produce a StateHash until the encoder is accepted."
+      },
+      {
+        "acceptance_targets": [
+          "ADR-002 in docs/decisions/ specifies the hash function algorithm bit-by-bit with enough detail for byte-identical reimplementation: either SplitMix64 applied to an FNV-1a accumulator of the arguments, or an alternative with equivalent justification; the ADR names which PRNG and which accumulator hash function and defines the mixing steps numerically",
+          "ADR-004 in docs/decisions/ specifies the concrete technical mechanism that makes calling division without an explicit rounding mode a build-time error (type-level wrapper, a lint rule keyed on a banned pattern, or a mandatory last parameter with no default), and names which rule or type constraint enforces it",
+          "No numeric parameter with economic effect is introduced in either ADR; those belong in a versioned config file per §19"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-002 — positional RNG, hash function is DEFINIR",
+          "§3 ADR-003 — no float; Tick and noise kernel use safe integer",
+          "§3 ADR-004 — every division declares rounding mode, enforcement is DEFINIR",
+          "§19 — DEFINIR items resolved by ADR before implementation"
+        ],
+        "title": "Write ADR-002 (hash function) and ADR-004 (rounding-mode enforcement)",
+        "why_now": "ADR-002 and ADR-004 are both DEFINIR items required before the rest of packages/core can be implemented. ADR-002 must specify the hash function bit-by-bit so that the positional RNG is deterministic across platforms (INV-19). ADR-004 must specify how calling division without a declared mode is made a compile-time or lint error. Both are pure document work that does not depend on the CanonicalEncoder being accepted and can proceed in parallel with IDEA-001."
+      },
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate exported as branded bigint types with nominal constructors that reject non-bigint input at runtime and produce a type error at compile time when mismatched",
+          "Tick exported as a branded safe-integer type whose constructor rejects non-integers and values outside [-(2^53-1), 2^53-1]",
+          "rand(masterSeed, namespace, ...coordinates) implemented in pure integer arithmetic using the hash specified in ADR-002, returning a deterministic uint64 represented as bigint; all namespace strings from the §3 ADR-002 table are accepted and isolated from each other",
+          "Division helpers expose TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, and ROUND_HALF_EVEN modes; calling without a mode argument is a TypeScript compile error",
+          "INV-23 test: a simulated ten-year reference computation confirms no safe-integer intermediate exceeds 2^53",
+          "npm run compile, npm run lint, npm run boundary, and npm run test all exit 0 on the submitted state"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002 — rand(masterSeed, namespace, ...coordinates)",
+          "§3 ADR-003 — Money, Quantity, Price, Rate as branded bigint; Tick as branded safe integer",
+          "§3 ADR-004 — division helpers with explicit rounding mode",
+          "§12 INV-22 — canonical encoding; INV-23 — no safe-integer overflow in 10-year replay",
+          "§15 FASE-1 — core complete"
+        ],
+        "title": "Implement packages/core: branded numeric types, positional RNG, and division helpers",
+        "why_now": "packages/core is the root of the §14.5 dependency graph. Every other package depends on it. Without it, the ledger (INV-04 to INV-07), the price generator (INV-02, INV-03), and the tick loop cannot exist. The branded types enforce ADR-003 at the type level; the RNG implements ADR-002; the division helpers implement ADR-004. Once IDEA-001 and IDEA-002 are accepted, core is the natural next unit of work."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main entry creates a BrowserWindow with contextIsolation: true, nodeIntegration: false, sandbox: true, and a restrictive Content Security Policy; no webSecurity: false anywhere",
+          "apps/desktop/preload exposes only named channels on contextBridge with an explicit allowlist; no generic invoke(channel, args) passthrough",
+          "apps/desktop/simulation-worker is loaded as a worker thread from main; renderer communicates with it only through the preload allowlist; typed message contract in packages/contracts",
+          "electron-builder produces an installable artifact for Windows (.exe) and Linux (.AppImage or .deb) in CI; the artifact opens a window (even if empty)",
+          "INV-29 test verifies the Electron webPreferences at runtime"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.2 — simulation worker, contextIsolation, nodeIntegration: false, sandbox: true, contextBridge allowlist",
+          "§14.6 — installer exists in FASE-1 in minimal form",
+          "§12 INV-29 — Electron security config active in all modes"
+        ],
+        "title": "Electron main skeleton: security config, preload allowlist, simulation worker, and minimal installer",
+        "why_now": "FASE-1 acceptance requires the simulation worker to be running out of the renderer thread with a typed message contract, Electron security config matching INV-29, and a minimal installer for Windows and Linux. This work is independent of the domain logic and can proceed in parallel with IDEA-003. Delivering the installer early surfaces ABI and packaging problems before the last week, which the spec explicitly warns against in §14.6."
+      },
+      {
+        "acceptance_targets": [
+          "price(assetId, tick) implemented in packages/world using only positional rand() calls; no state, no PRNG with mutable position",
+          "trendLayer and idiosyncraticNoise each implemented as fractal noise summed over octaves with fixed periods, sampled at block vertices and linearly interpolated; parameters stored in a versioned config file",
+          "Two assets (ORB and NEXA) registered with archetype parameters",
+          "INV-02 test: for 1000 random (assetId, tick) pairs, direct lookup equals result of advancing tick-by-tick from zero",
+          "INV-03 test: two calls with different player-action logs produce identical worldPrice sequences on the same seed",
+          "npm run compile, npm run lint, npm run boundary, and npm run test all exit 0"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 — price construction: trendLayer, idiosyncraticNoise, two noise layers, O(1) lookup",
+          "§3 ADR-002 — positional RNG namespaces: market.trend, market.factor",
+          "§3 ADR-005 — tick-base price is a single point, no OHLC",
+          "§12 INV-02, INV-03",
+          "§15 FASE-1 — price generator with two noise layers and two assets"
+        ],
+        "title": "Implement packages/world: two-asset price generator with two noise layers",
+        "why_now": "The price generator is the first domain-neutral module that produces observable, testable output: INV-02 (direct tick lookup equals tick-by-tick advance) and INV-03 (player actions do not alter world price). With packages/core accepted, the world generator can be built and its two most important invariants can be put under automated test. This is the earliest point in FASE-1 where the determinism contract becomes measurable rather than structural."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo infrastructure is complete: workspace config, strict TypeScript, ESLint determinism rules, boundary checker, and CI pipeline are all in place and passing. Every package source file is a single-line empty stub (export {}). No ADRs have been written. The CanonicalEncoder (ADR-009 prerequisite) has been attempted in TASK-0004, TASK-0005, and TASK-0006, all rejected for the same two recurring issues: mutable globals read at call time instead of module init, and absence of independently captured npm run compile and npm run boundary output. Idea cycles 043-049 produced no proposals.",
+      "highest_priority_gap": "CanonicalEncoder not accepted after three consecutive rejections, blocking all StateHash-dependent FASE-1 work. The two recurring rejection causes are technically straightforward: Number.MAX_SAFE_INTEGER and companion built-ins must be captured at module initialization, and compile/boundary evidence must be verbatim captured output rather than summarized claims."
+    },
+    "warnings": [
+      "The CanonicalEncoder has been rejected across three task attempts (TASK-0004, TASK-0005, TASK-0006) for the same two issues each time. The evidence requirement (verbatim captured compile/boundary output rather than summarized claims) is procedural and must be satisfied by the submission format, not just by running the commands locally. Implementers should treat it as a mandatory evidence artifact, not as an implicit pass.",
+      "Idea cycles 043 through 049 produced empty proposal payloads. This ideation gap means the benchmark has been in a heartbeat-only state for several hours with no work proposed. The root cause appears to be the CanonicalEncoder blocking all visible FASE-1 progress; IDEA-004 (Electron skeleton) is deliberately independent of the encoder and should be proposed as parallel work.",
+      "ADR-009 had an internal self-contradiction on Set subclasses found during TASK-0005 review. The contradiction is within the team-authored ADR, not in CICLO_SPEC.md, so it does not need a SPEC_BLOCKERS.md entry. It must be resolved in the ADR text and implementation consistently before the next encoder submission."
+    ]
+  }
+}
