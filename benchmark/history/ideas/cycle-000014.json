@@ -1,0 +1,98 @@
+{
+  "created_at": "2026-08-13T23:58:05.394462+00:00",
+  "cycle_id": "CYCLE-000014",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "pnpm-workspace.yaml replaced by npm workspaces config in root package.json; pnpm-lock.yaml replaced by package-lock.json; CI uses npm ci instead of pnpm install; all root commands (npm run compile, npm run lint, npm run boundary, npm run test) invoke via npm without any corepack or external pnpm setup step",
+          "Every workspace tsconfig include pattern covers .ts, .tsx, .mts, .cts (e.g. src/**/*.{ts,tsx,mts,cts} or equivalent inclusive glob); configuration test enumerates all workspace projects and asserts all four extensions are covered",
+          "All five validation commands pass in the authoritative review environment without retries, exclusions, or weakened checks",
+          "CI workflow passes with clean install, compile, lint, boundary, and test jobs on the committed repository state"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§14.1 Stack travada — monorepo mandated, package manager not specified",
+          "§15 FASE-1 aceite — lint, boundary, compile, test all blocking",
+          "§17 Gate de CI — clean install, compile, lint, boundary, test",
+          "INV-26",
+          "INV-29"
+        ],
+        "title": "Fix TASK-0001: switch workspace manager to npm and fix TypeScript extension coverage",
+        "why_now": "TASK-0001 has been rejected twice on two specific, fixable failures. BLOCKER REVIEW-001: in both review attempts the authoritative validation environment resolves 'pnpm' to '/workspace/pnpm', causing 'Cannot find module' before lint or test execute. The attempt-02 fix (corepack to /tmp/pnpm-bin) did not persist in the review environment. The spec mandates a monorepo but does not mandate pnpm; switching root commands and workspace config to npm workspaces eliminates the dependency on any external package manager install step since npm ships with Node.js. MAJOR REVIEW-002: every workspace tsconfig uses include: ['src/**/*.ts'], silently excluding .tsx, .mts, .cts from compilation, which the review correctly identifies as a must-preserve violation. Both failures must be corrected together because either alone is insufficient for acceptance. Nothing else can advance until this task is committed."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/ADR-002-hash-function.md: specifies the rand() algorithm bit-exactly (e.g. SplitMix64 over FNV-1a accumulator of all arguments concatenated), the full interface signature, all eleven namespace constants, and at least three deterministic test vectors; references INV-02 and INV-12",
+          "docs/decisions/ADR-004-rounding-enforcement.md: specifies how omitting a rounding mode on division is made a TypeScript type error or blocking ESLint error, names the three permitted modes (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN), and describes the residue posting rule",
+          "docs/decisions/ADR-009-canonical-encoder.md: specifies UTF-8 byte-ordered key sorting applied recursively, bigint as signed decimal ASCII without leading zeros or exponential notation, distinct type marker for safe integer vs bigint so 1n and 1 encode differently, prohibition of undefined/NaN/Infinity/-0 as thrown errors, ordered vs unordered collection encoding, encodingVersion participation in hash, and the StateHash vs SaveHash distinction including the deliberate exclusion of finalTick from StateHash",
+          "Each ADR includes: context, options considered, decision, consequences, and a list of invariants it closes"
+        ],
+        "category": "documentation",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 — função de hash é DEFINIR, especificada bit a bit em ADR antes de qualquer rand()",
+          "ADR-004 — imposição técnica do modo de arredondamento é DEFINIR",
+          "ADR-009 — CanonicalEncoder especificado em ADR próprio antes de qualquer hash de estado existir",
+          "§15 FASE-1 aceite — ADR-009 escrito e encoder implementado antes de qualquer hash",
+          "§19 Protocolo de ambiguidade — ADR registrado antes da implementação"
+        ],
+        "title": "Write ADR-002 (hash function), ADR-004 (rounding enforcement), and ADR-009 (CanonicalEncoder)",
+        "why_now": "FASE-1 acceptance explicitly requires ADR-009 to be written and the encoder implemented before any state hash exists. ADR-002 requires the hash function to be specified bit-by-bit in an ADR before any rand() implementation. ADR-004 requires the technical enforcement mechanism for rounding-mode declaration to be resolved before the division helper in packages/core can exist. All three are DEFINIR items with no remaining ambiguity that would block the decision. These ADRs are markdown files in docs/decisions/ and can be committed independently of the workspace tooling fix — they do not depend on pnpm or npm being functional. Writing them now eliminates the last prerequisite blockers for packages/core so that implementation can begin in the next cycle after TASK-0001 is accepted."
+      },
+      {
+        "acceptance_targets": [
+          "Branded types Money, Quantity, Price, Rate as bigint nominal types with constructors that reject non-integers; branded Tick and index types as number nominal types restricted to [-(2^53-1), 2^53-1] with constructors rejecting NaN, Infinity, non-integer, and out-of-range values",
+          "Constants QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n",
+          "divInt(a, b, mode) where omitting mode is a TypeScript type error or blocking ESLint violation per ADR-004; all three rounding modes implemented correctly including residue",
+          "rand(masterSeed, namespace, ...coords) pure function returning uint64 as safe integer, implementing the algorithm from ADR-002 bit-exactly; all eleven namespace constants exported from namespaces.ts",
+          "CanonicalEncoder.stateHash() and saveHash() per ADR-009 spec; stateHash output is identical when finalTick changes (INV-22)",
+          "Unit tests: constructors reject invalid inputs; rand is reproducible for identical inputs, sensitive to each argument, distinct across namespaces; encoder produces identical bytes for identical logical state and different bytes for different state; 1n and 1 encode differently; undefined/NaN throws",
+          "INV-23 property test: no safe-integer overflow across 10-year tick range (0 to 5.3e8)",
+          "All §13 prohibitions pass lint with zero violations within packages/core"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "ADR-003",
+          "ADR-004",
+          "ADR-009",
+          "§4 Glossário travado — Money, Quantity, Price, Rate, Tick",
+          "§14.4 core — aritmética inteira, hash, rng posicional, ponto fixo, encoder canônico",
+          "INV-12",
+          "INV-22",
+          "INV-23"
+        ],
+        "title": "Implement packages/core: branded numeric types, positional RNG, CanonicalEncoder, and arithmetic helpers",
+        "why_now": "packages/core is the leaf dependency of every other package in the directed graph (§14.5: core -> nothing). Without branded Money, Quantity, Price, Rate, Tick types and their constructors, ADR-003 and ADR-004 have no type-level enforcement and violations accumulate silently from the first domain file. Without positional rand(), packages/world cannot begin. Without CanonicalEncoder, no StateHash can be produced and INV-01, INV-17, INV-22 have no foundation. This is the highest-value implementation unit after the workspace tooling is functional and the three prerequisite ADRs exist."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Repository contains only benchmark scaffolding. TASK-0001 (monorepo bootstrap with strict TypeScript and blocking lint gates) has been attempted twice and rejected twice via REQUEST_CHANGES. All three checkpoints report internal_commit_count=0 and NO_ACCEPTED_CHANGES. Review-02 identified two remaining failures: BLOCKER — pnpm resolves to '/workspace/pnpm' (not a pnpm CLI) in the authoritative review environment, causing lint and test commands to exit before executing; MAJOR — every workspace tsconfig include covers only .ts files, silently excluding .tsx, .mts, .cts from compilation. Attempt-02 tried to fix the pnpm issue via corepack to /tmp/pnpm-bin but this did not persist in the review environment. No packages under packages/, apps/, or tools/ contain any production logic. No ADRs exist in docs/decisions/. Every FASE-1 acceptance criterion is unmet.",
+      "highest_priority_gap": "TASK-0001 must be accepted before any other work can land. The two specific failures blocking acceptance are (1) the pnpm CLI not being available in the review environment under any invocation tried so far, and (2) TypeScript compilation silently excluding supported source extensions. Both must be resolved in a single attempt to achieve acceptance."
+    },
+    "warnings": [
+      "SYSTEMIC: After 14 cycles and 4286 seconds of active benchmark runtime, internal_commit_count remains 0. TASK-0001 has been rejected twice on the same pnpm environment issue (Cannot find module '/workspace/pnpm'). The Implementer's attempt-02 fix (corepack enable pnpm to /tmp/pnpm-bin) did not solve the problem in the authoritative environment. Further attempts to configure pnpm in the review environment are unlikely to succeed; the correct fix is to eliminate the pnpm dependency by switching workspace commands to npm, which ships with Node.js and requires no additional provisioning.",
+      "DEFINIR BLOCKER — price generator transcendental functions: §5.1 constructs prices in log-space, requiring log and exp. Both are prohibited in pure packages by §13. An ADR specifying fixed-point or lookup-table implementations producing bit-identical results across platforms must be written before packages/world can begin. This ADR is distinct from ADR-002 and ADR-009 and has not yet been proposed as a standalone deliverable.",
+      "DEFINIR BLOCKER — octave parameters: the number of octaves, their periods, and amplitudes for trendLayer and idiosyncraticNoise are DEFINIR per §5.1. These must be fixed in a versioned configuration file with ADR before the price generator is written, because any post-implementation change requires an encodingVersion bump and invalidates all frozen reference StateHashes."
+    ]
+  }
+}

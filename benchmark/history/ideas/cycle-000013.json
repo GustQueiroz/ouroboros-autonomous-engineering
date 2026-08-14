@@ -1,0 +1,180 @@
+{
+  "created_at": "2026-08-13T23:53:49.696255+00:00",
+  "cycle_id": "CYCLE-000013",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "All 16 mandated workspace packages and apps registered under an npm workspaces root package.json; 'npm install' with a committed lockfile succeeds in the authoritative review environment without requiring any tool not bundled with Node.js LTS",
+          "Every workspace tsconfig includes '**/*.{ts,tsx,mts,cts}' (or equivalent) in its include array; a configuration test enumerates all workspace projects and asserts this pattern is present in every one",
+          "'npm run compile' exits 0 with strict and noUncheckedIndexedAccess active across all projects",
+          "'npm run lint' exits 0; ESLint applies PURE_RULES to .ts, .tsx, .mts, and .cts in all packages/* except the spec-authorized impure exceptions (adapters, ui); fixture tests prove each Section 13 prohibition category is rejected through the production config",
+          "'npm run boundary' exits 0; boundary gate validates declared direct edges from Section 14.5, not transitive closure; relative cross-workspace imports are detected and rejected; a transitive-violation test confirms an illegal edge cannot be hidden through an intermediate package",
+          "'npm run test' exits 0 with all gate tests passing: lint fixtures, boundary fixtures (allowed edges, forbidden edges, relative cross-package, transitive violation), and configuration coverage tests",
+          "SPEC_BLOCKERS.md present with Section 19 fields; no production algorithm or DEFINIR-dependent behavior introduced"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§14.1 Stack travada — TypeScript monorepo, strict mode",
+          "§14.4 Estrutura de pacotes",
+          "§14.5 Arquitetura verificável — blocking dependency-boundary lint",
+          "§13 Proibições verificáveis por lint — default negation for pure packages",
+          "§17 Gate de CI — compilation, lint, test blocking",
+          "§15 FASE-1 aceite — lint de determinismo e lint de fronteira bloqueantes",
+          "INV-26",
+          "INV-29"
+        ],
+        "title": "Resolve TASK-0001's two persistent review blockers: package-manager executable and tsconfig source-extension coverage",
+        "why_now": "Two consecutive implementation attempts (attempt-01 and attempt-02) and two reviews have been blocked by the same two findings: (1) the authoritative review environment cannot execute pnpm commands because '/workspace/pnpm' is not a valid Node.js module, and (2) every workspace tsconfig's include pattern covers only '*.ts', so .tsx, .mts, and .cts files are silently excluded from compilation — a violation of the must-preserve requirement that newly added source cannot bypass gates. Thirteen cycles have elapsed with zero committed code. This is the only path to unblocking all other FASE-1 work. The fix for finding (1) is to replace pnpm workspaces with npm workspaces, which is built into every Node.js installation and requires no separate executable. The fix for finding (2) is to expand every tsconfig include to '**/*.{ts,tsx,mts,cts}' and add a configuration test proving coverage. No new production logic is introduced."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/ADR-002-hash-function.md: names and specifies the chosen hash (e.g. SplitMix64 over FNV-1a accumulator), defines argument serialization into the accumulator, specifies output range as uint64, includes at least three test vectors, and explains why a non-native hash is required; closes the DEFINIR item from ADR-002",
+          "docs/decisions/ADR-004-rounding-enforcement.md: specifies the concrete TypeScript mechanism (e.g. function overload requiring explicit RoundingMode enum argument, or ESLint rule detecting bare division operators on branded types) by which calling division without an explicit mode produces a type error or blocking lint error; includes a minimal code example showing compliant and non-compliant usage",
+          "docs/decisions/ADR-009-canonical-encoder.md: specifies recursive UTF-8 byte-order key sorting, bigint as signed decimal ASCII without leading zeros or exponential notation, distinct type marker for safe integer vs bigint so 1n and 1 produce different bytes, prohibition of undefined/NaN/Infinity/-0 as thrown errors (not silent normalization), encoding of ordered vs unordered collections including normative sort for unordered, encodingVersion participation in hash, and the exact StateHash vs SaveHash distinction including what enters each (StateHash excludes finalTick per INV-22)",
+          "Each ADR references the invariants it protects and the DEFINIR item it closes; no encoding or arithmetic behavior is implemented"
+        ],
+        "category": "documentation",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 — função de hash é DEFINIR, especificada bit a bit em ADR",
+          "ADR-004 — imposição técnica do modo de arredondamento é DEFINIR",
+          "ADR-009 — CanonicalEncoder especificado em ADR próprio antes de qualquer hash de estado",
+          "§19 Protocolo de ambiguidade — ADR antes de implementação",
+          "§15 FASE-1 aceite — ADR-009 escrito e encoder implementado antes de qualquer hash"
+        ],
+        "title": "Write the three DEFINIR ADRs required before packages/core can be implemented",
+        "why_now": "ADR-002 requires the rand() hash function to be specified bit-exactly in an ADR before any implementation of rand() is written — any choice embedded in code without an ADR cannot be changed without an encodingVersion bump that invalidates all future reference StateHashes. ADR-009 is an explicit FASE-1 acceptance criterion: the CanonicalEncoder must be specified in its own ADR before any state hash exists. ADR-004 requires the mechanism for making division-without-rounding-mode a type or lint error to be decided before arithmetic helpers are written, because the division API shape depends on this choice. All three must precede packages/core work. These ADRs are pure documentation, depend only on the workspace existing, and can be proposed and written in the same cycle that resolves IDEA-001."
+      },
+      {
+        "acceptance_targets": [
+          "Branded types Money, Quantity, Price, Rate exported as bigint nominal types with constructors that reject non-bigint, non-integer, and out-of-range inputs and throw on construction",
+          "Branded type Tick and noise/index types exported as safe-integer number nominal types with constructors rejecting NaN, Infinity, non-integer, and values outside [-(2^53-1), 2^53-1]",
+          "Constants QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n exported",
+          "divInt(a: bigint, b: bigint, mode: RoundingMode): bigint where mode is TRUNCATE_TOWARD_ZERO | ROUND_HALF_UP | ROUND_HALF_EVEN and omitting mode is a TypeScript type error per ADR-004 mechanism",
+          "rand(masterSeed: string, namespace: Namespace, ...coords: number[]): number — pure stateless function implementing ADR-002 bit-exactly; all 11 namespaces from the ADR-002 table declared as typed constants",
+          "CanonicalEncoder implementing ADR-009: stateHash() accepting state object and returning hex string excluding finalTick (INV-22); saveHash() accepting full save envelope including finalTick",
+          "Unit tests: branded constructors reject invalid inputs; rand produces identical output for identical inputs and distinct output across namespaces; stateHash is stable when only finalTick changes; 1n and 1 encode to different bytes; undefined/NaN/-0 passed to encoder throw",
+          "Property test: no safe-integer overflow in Tick or noise arithmetic across a 10-year tick range (INV-23)",
+          "Zero lint violations from Section 13 rules in packages/core source"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "ADR-003",
+          "ADR-004",
+          "ADR-009",
+          "§4 Glossário travado — typed terms Money, Quantity, Price, Rate, Tick",
+          "§14.4 core package — aritmética inteira, hash, rng posicional, ponto fixo, encoder canônico",
+          "INV-12",
+          "INV-22",
+          "INV-23",
+          "§13 Proibições verificáveis por lint"
+        ],
+        "title": "packages/core — branded numeric types, positional RNG, CanonicalEncoder, and arithmetic helpers",
+        "why_now": "packages/core is the sole dependency of packages/world, packages/domain, packages/narrative, and packages/contracts. Without branded bigint types (Money, Quantity, Price, Rate) and branded safe-integer types (Tick and noise/index types), the type system cannot enforce ADR-003 or ADR-004 and downstream packages will silently mix incompatible numeric representations. Without the positional rand() matching ADR-002 bit-exactly, packages/world cannot be written. Without CanonicalEncoder per ADR-009, no StateHash can be produced and INV-01, INV-17, and INV-22 have no foundation. This is the single highest-leverage implementation deliverable in FASE-1 and must precede all domain and world work."
+      },
+      {
+        "acceptance_targets": [
+          "packages/world: price(assetId, tick): Price is a pure function with no mutable state; two assets (ORB and NEXA) with logPrice0, two octaves of trendLayer and two of idiosyncraticNoise using block-vertex sampling and linear interpolation in fixed-point arithmetic; all parameters in a versioned config file; no Math.sin/exp/log/pow used — fixed-point or lookup-table per ADR; INV-02 test verifies direct price query equals tick-by-tick accumulation for 1000 random (asset, tick) pairs",
+          "packages/domain: Transaction type enforces per-commodity zero-sum; all minimum accounts from Section 6 defined; market buy and sell spot orders produce balanced four-entry transactions with rounding residue posted to world:rounding_residue per commodity and causationId on every Transaction; INV-04 through INV-07 and INV-13 verified by unit and property tests",
+          "packages/application: processTick implements the ten-step canonical order from Section 7 in a single readable function; test verifies step ordering by interception; save format per ADR-006 with specVersion, rulesetVersion, encodingVersion, masterSeed, finalTick, and actions; INV-21 enforced on load",
+          "INV-01 verified: replay of a reference save produces identical StateHash at every tick; INV-03 verified: two sessions with same seed and different action logs produce identical worldPrice series"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-004",
+        "risk": "high",
+        "spec_refs": [
+          "§5.1 Construção do preço",
+          "§6 Ledger",
+          "§7 Execução e ordem canônica do tick — sequência TRAVADA",
+          "ADR-003",
+          "ADR-004",
+          "ADR-005",
+          "ADR-006",
+          "ADR-007",
+          "§14.5 Composição de world com domain via application",
+          "INV-01",
+          "INV-02",
+          "INV-03",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-13",
+          "INV-21",
+          "INV-22",
+          "§15 FASE-1 aceite"
+        ],
+        "title": "packages/world, packages/domain, packages/application — price generator, double-entry ledger, canonical tick loop, and save format",
+        "why_now": "These three packages compose the functional FASE-1 simulation core and must be delivered together because packages/application is the only layer that can compose packages/world and packages/domain without coupling them (Section 14.5 prohibits world from knowing domain and vice versa). The price generator is the entry point for INV-02 — explicitly described by the spec as the most important test in the project. The double-entry ledger is the entry point for INV-04 through INV-07. The canonical tick loop from Section 7 implements the ten-step locked order, which is a named FASE-1 acceptance criterion. The save format per ADR-006 with INV-21 enforcement is required before tools/replay can exist."
+      },
+      {
+        "acceptance_targets": [
+          "tools/replay CLI accepts two save files and outputs IDENTICAL or DIVERGED AT TICK n with StateHash values for both paths; integration test runs it against a reference save",
+          "tools/bench: calibration micro-benchmark runs first in the same process; measures price(asset,tick) and 1-tick-advance at p95 across 20 samples after 3 warmup discards; emits full per-sample data not just aggregate; calibration ratios frozen in a versioned file; CI fails if any ratio regresses more than 20%",
+          "apps/desktop Electron shell with contextIsolation:true, nodeIntegration:false, sandbox:true verified programmatically in all configurations including development (INV-29); preload exposes only allowlisted channels via contextBridge; no unsafe-eval in CSP",
+          "Minimum UI: lightweight-charts price chart for at least one asset, player BRL balance display, buy and sell market order buttons, pause and 1x time controls; all labels in Portuguese; permanent non-dismissable simulation disclaimer per Section 20",
+          "electron-builder produces a Windows NSIS installer and a Linux AppImage in CI; INV-19 verified by CI matrix comparing simulation-worker StateHash against tools/replay output on both platforms for a reference save"
+        ],
+        "category": "tooling",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003",
+          "IDEA-004"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§15 FASE-1 aceite — tools/replay, tools/bench, interface mínima",
+          "§14.6 Empacotamento e plataformas — instalador mínimo na FASE-1",
+          "§17 Gate de CI — replay de três partidas de referência, matriz de plataformas",
+          "§18 Orçamento de performance — protocolo de medição travado",
+          "§20 Aviso obrigatório no produto",
+          "INV-01",
+          "INV-11",
+          "INV-19",
+          "INV-29"
+        ],
+        "title": "tools/replay, tools/bench with frozen calibration ratios, and minimum Electron UI to complete FASE-1 acceptance",
+        "why_now": "FASE-1 acceptance explicitly requires: (1) tools/replay that compares two executions and reports the first divergent tick, (2) tools/bench with calibration micro-benchmark and performance ratios frozen in a versioned file, and (3) a minimum UI with price chart via lightweight-charts, player BRL balance, buy/sell market order buttons, pause and 1x time controls, and the permanent non-dismissable disclaimer required by Section 20. The spec warns (Section 14.6) that deferring the Windows/Linux installer past FASE-1 leads to unrecoverable ABI and packaging failures. The performance baseline frozen in tools/bench has no reference to compare against for the rest of the project if deferred. INV-19 (same StateHash on Windows and Linux, simulation-worker vs CLI replay) requires the cross-platform CI matrix that depends on both tools/replay and the Electron shell existing."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Repository contains zero production code after 13 benchmark cycles and approximately 4036 seconds of active runtime. TASK-0001 (monorepo scaffold, strict TypeScript, blocking lint gates) was created in CYCLE-000011 and has gone through two implementation attempts and two reviews, both returning REQUEST_CHANGES. CHECKPOINT-0003 confirms 0 internal commits and status NO_ACCEPTED_CHANGES. The workspace filesystem has no package.json, no tsconfig, no packages/, no apps/, no tools/, no ADRs, and no CI pipeline.",
+      "highest_priority_gap": "TASK-0001 has failed review twice with the same root cause: the authoritative benchmark review environment resolves 'pnpm' to '/workspace/pnpm', which is not a valid Node.js module, causing 'Cannot find module /workspace/pnpm' when lint and test commands are invoked. A second blocker is that tsconfig include patterns cover only *.ts, silently excluding .tsx, .mts, and .cts source files from compilation. Both issues must be resolved before any committed code can exist and before any other FASE-1 work can proceed."
+    },
+    "warnings": [
+      "SYSTEMIC — 13 cycles, 0 committed changes: The benchmark has been running approximately 4036 seconds with zero accepted code. TASK-0001 has failed two consecutive reviews with the same root cause: the authoritative review environment resolves 'pnpm' to '/workspace/pnpm', which is not a valid Node.js module, causing 'Cannot find module /workspace/pnpm' at lint and test execution. All proposals that involve a package manager must use npm workspaces (built into Node.js LTS, requires no separate executable) rather than pnpm, or must include a mechanism that is provably executable without any tool beyond Node.js in the benchmark sandbox.",
+      "DEFINIR BLOCKER — transcendental functions: Section 5.1 constructs prices in log-space (requiring log and exp), but Section 13 prohibits Math.log, Math.exp, and Math.pow in all pure packages. An ADR specifying a fixed-point or linear-interpolation-over-lookup-table implementation that produces bit-identical results across platforms must be written before packages/world work begins. This ADR is not listed in the spec's known-gaps section but is a necessary consequence of Sections 5.1 and 13 read together. Implementing packages/world before this ADR exists will violate either Section 13 or INV-19.",
+      "DEFINIR BLOCKER — octave parameters: the number of octaves, their block periods, and their amplitudes for trendLayer and idiosyncraticNoise are DEFINIR per Section 5.1. These must be recorded in a versioned configuration file with an ADR before the price generator is implemented, because any parameter change after tools/bench freezes the performance baseline requires an encodingVersion bump and invalidates all reference StateHashes.",
+      "DEFINIR BLOCKER — hash function: ADR-002 requires the hash function to be specified bit-exactly in an ADR before any rand() implementation. As of CYCLE-000013 no such ADR exists. Any rand() written without it embeds an unrecorded decision that cannot be changed without a breaking encodingVersion bump invalidating future saved games and CI reference hashes."
+    ]
+  }
+}
