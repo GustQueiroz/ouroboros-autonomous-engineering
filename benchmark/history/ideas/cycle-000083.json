@@ -1,0 +1,139 @@
+{
+  "created_at": "2026-08-14T09:47:56.495043+00:00",
+  "cycle_id": "CYCLE-000083",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "docs/decisions/0009-canonical-encoder.md committed with: exact admitted type set, UTF-8 key ordering algorithm, bigint decimal representation rule, safe-integer type marker, prohibition list (undefined/NaN/Infinity/-0/Symbol/class instance/Proxy/function), encodingVersion participation in hash",
+          "packages/core/src/canonical-encoder.ts exports CanonicalEncoder and CanonicalEncoderError; no other exports introduced",
+          "Golden-byte tests: at least one fixture per admitted type and one fixture per rejection case with expected error code; each test hard-codes the exact expected byte sequence or error, not a round-trip comparison",
+          "All admitted types produce deterministic bytes identical across two independent calls with equal input",
+          "All prohibited values throw CanonicalEncoderError with a documented error code before any property access occurs",
+          "npm run compile, npm run boundary, npm run lint, npm test all exit 0 with full captured output included in submission"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-009",
+          "INV-22",
+          "§15 FASE-1 aceite: ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir",
+          "§12 INV-01",
+          "§17 Gate de CI item 5"
+        ],
+        "title": "CanonicalEncoder: minimal-scope fresh attempt with golden-byte tests",
+        "why_now": "Six consecutive encoder attempts (TASK-0004 through TASK-0007, three iterations each on 0007 alone) have all been rejected, leaving the workspace with zero production code after 10+ hours of benchmark time. The encoder gates INV-01, INV-22, and CI gate step 5 — without it no StateHash can exist. The systematic failure pattern suggests the previous attempts kept expanding scope to answer each new reviewer finding, resulting in ever-larger attack surfaces and new findings. A narrower attempt that admits exactly the types ADR-009 requires for CICLO state (null, boolean, bigint, safe-integer number, string, plain-object with string-only own data-property keys, Array of admitted values, Uint8Array) and rejects everything else explicitly — confirmed by golden-byte fixture tests with hard-coded expected hex — is more likely to survive review than a general-purpose encoder with adversarial coverage bolted on after rejection."
+      },
+      {
+        "acceptance_targets": [
+          "packages/core/src/types.ts exports Money, Quantity, Price, Rate as branded bigint with constructors that reject non-bigint and out-of-range input",
+          "packages/core/src/types.ts exports Tick as branded number with constructor rejecting non-integer and values outside [0, 2^53-1]",
+          "Constants QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n exported as bigint",
+          "Division helpers with explicit RoundingMode enum (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) compile-error on missing mode",
+          "Property test confirming Tick arithmetic over a 10-year replay does not exceed 2^53-1 (INV-23)",
+          "No floating-point literals; no Math functions; lint and boundary gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "§4 Modelo de domínio glossário travado",
+          "§15 FASE-1: core completo. Aritmética inteira",
+          "INV-23"
+        ],
+        "title": "Core branded arithmetic types: Money, Quantity, Price, Rate, Tick",
+        "why_now": "FASE-1 requires 'core completo. Aritmética inteira' as its first scope item. These types are independent of the encoder and independent of any hash or RNG — they can be implemented and accepted while encoder attempts continue. They are prerequisites for the ledger, the price generator, the tick loop, and every downstream package. ADR-003 specifies their representation precisely (bigint branded for Money/Quantity/Price/Rate; safe-integer number branded for Tick). No task currently blocks this work."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/NNNN-hash-function.md committed specifying the chosen algorithm (e.g. SplitMix64 over FNV-1a accumulator) with every arithmetic step, bit width, and mixing constant given exactly",
+          "ADR specifies how masterSeed string, namespace string, and variadic coordinate number arguments are concatenated/accumulated before hashing",
+          "ADR confirms the function is not the native language hash and cites the exact specification for the chosen algorithm",
+          "ADR documents the output type (uint64 expressed as a pair of safe integers or as bigint) and range",
+          "No implementation code introduced; ADR only"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "§19 lacunas conhecidas: função de hash",
+          "§15 FASE-1: rng posicional"
+        ],
+        "title": "Write hash function ADR (DEFINIR from ADR-002)",
+        "why_now": "ADR-002 is TRAVADA and mandates the hash function be 'especificada bit a bit em ADR, e não pode ser a função de hash nativa'. This is listed as an explicit DEFINIR item in §19. Without the ADR, the positional rand() function cannot be implemented correctly, blocking the RNG and in turn the price generator. Writing the ADR is a documentation-only task with no code changes, low rejection risk, and high unblocking value. It can proceed in parallel with the encoder attempt."
+      },
+      {
+        "acceptance_targets": [
+          "packages/core/src/rng.ts exports rand(masterSeed: string, namespace: string, ...coordinates: number[]): bigint returning a value in [0, 2^64)",
+          "Pure function with no mutable state; identical inputs always produce identical output",
+          "Namespace isolation verified: rand(s,'market.trend',0,0) !== rand(s,'market.factor',0,0) for any s",
+          "Test: rand at coordinate N equals result for coordinate N regardless of call order (INV-02 analog for the RNG layer)",
+          "Implementation matches hash algorithm in the hash-function ADR bit-for-bit",
+          "No Math.random(), no native crypto, no PRNG with state; lint gate passes"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-03",
+          "INV-12",
+          "§5.1 Construção do preço",
+          "§15 FASE-1: rng posicional"
+        ],
+        "title": "Implement positional RNG: rand(masterSeed, namespace, ...coordinates)",
+        "why_now": "INV-02 — 'consultar price(asset, t) diretamente é igual a chegar em t avançando tick por tick' — is described in the spec as the most important test in the project. It depends entirely on the positional RNG. Every market namespace (market.trend, market.factor, market.regime, macro.schedule, bot.policy, etc.) derives from rand(). FASE-1 requires the price generator with two noise layers, which requires rand(). This task unblocks the price generator and the full tick loop."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main/src/index.ts boots an Electron BrowserWindow with contextIsolation:true, nodeIntegration:false, sandbox:true",
+          "apps/desktop/preload/src/index.ts exposes an empty allowlist via contextBridge (no generic invoke channel)",
+          "electron-builder configuration in tools/package produces a .exe installer for Windows and an AppImage or .deb for Linux",
+          "CI workflow (GitHub Actions) builds installers for both platforms on push",
+          "INV-29 audit: webPreferences fields verified by automated test reading the createWindow call",
+          "No game logic; window may display a static placeholder text in Portuguese per §20 disclaimer"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.6 Empacotamento e plataformas",
+          "§14.1 Stack travada",
+          "§14.2 Topologia de processos",
+          "§15 FASE-1 aceite: Instalador mínimo para Windows e Linux produzido pelo CI",
+          "INV-29"
+        ],
+        "title": "Minimum Electron installer for Windows and Linux",
+        "why_now": "FASE-1 acceptance criteria explicitly require 'Instalador mínimo para Windows e Linux produzido pelo CI, ainda que a aplicação faça pouco'. The spec at §14.6 warns: 'se o empacotamento multiplataforma aparecer depois, o time descobre problema de módulo nativo, de ABI e de caminho de arquivo na última semana'. After 10+ hours with zero accepted tasks, this risk is now pressing. A minimal installer (an Electron window showing a placeholder) is independent of the encoder, arithmetic types, and RNG — it can be delivered immediately and would be the first accepted deliverable to break the stall."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold only: all 8 package stubs export {}; 4 desktop sub-app stubs export {}; 3 tool stubs export {}. Lint, boundary checker, and structural tests committed and passing. Zero ADRs in docs/decisions/. Zero production code in any package. 31 consecutive heartbeat checkpoints with 0 accepted tasks across 10.5 hours of benchmark time. TASK-0004 through TASK-0007 (six total implementation attempts) all targeted the CanonicalEncoder and were all rejected.",
+      "highest_priority_gap": "CanonicalEncoder (ADR-009) has been attempted six times across four tasks and rejected each time, leaving the workspace with no production code. The encoder gates INV-01, INV-22, and CI gate step 5 (StateHash comparison). Parallel FASE-1 work — branded arithmetic types, hash function ADR, positional RNG, and the Electron installer — remains unstarted and unblocked by the encoder stall."
+    },
+    "warnings": [
+      "Systematic encoder rejection: six consecutive attempts (TASK-0004 through TASK-0007 attempt-03) have failed. The pattern suggests each attempt added complexity to address the latest review finding while creating new surface area for the next. A seventh attempt must be narrower, not broader: admit only the exact types that appear in CICLO state (null, boolean, bigint, safe-integer number, string, plain object with string-keyed own data properties, Array, Uint8Array), reject everything else with an explicit error code, and prove correctness with golden-byte fixtures rather than adversarial property tests.",
+      "Zero accepted tasks in 10.5 hours represents total project stall. Parallel independent tasks (IDEA-002 through IDEA-005) must be assigned concurrently with the encoder retry rather than sequentially after it — waiting for the encoder to be accepted before starting arithmetic types or the installer reproduces the same single-threaded bottleneck that caused the stall.",
+      "The spec at §14.6 states the installer must exist in FASE-1 and warns explicitly about last-week ABI failures if deferred. After 10+ hours of stall, this risk is no longer theoretical. IDEA-005 (minimum installer) can be accepted independently of all other FASE-1 work and would be the first tangible deliverable of the benchmark."
+    ]
+  }
+}

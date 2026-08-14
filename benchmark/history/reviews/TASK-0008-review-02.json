@@ -1,0 +1,94 @@
+{
+  "created_at": "2026-08-14T09:39:23.552109+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "For every admitted plain object, the encoder examines all own property descriptors rather than only enumerable keys.",
+        "evidence": "encodePlainObject uses Object.getOwnPropertyNames, Object.getOwnPropertySymbols, and Object.getOwnPropertyDescriptor for each string-keyed own property.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "A plain object with any non-enumerable own string-keyed data property causes CanonicalEncoderError.",
+        "evidence": "encodePlainObject checks descriptor.enumerable before reading descriptor.value and throws NON_ENUMERABLE_PROPERTY; tests 51, 53, 55, 57, and 62 cover direct and nested cases.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "A plain object with any non-enumerable own string-keyed accessor property causes CanonicalEncoderError without invoking the accessor.",
+        "evidence": "The enumerability check precedes the data/accessor distinction. Tests assert NON_ENUMERABLE_PROPERTY and zero getter/setter invocation.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "ADR-009 explicitly states that non-enumerable own properties are unsupported and identifies CanonicalEncoderError as the required outcome.",
+        "evidence": "ADR-009 §5 explicitly rejects non-enumerable data and accessor properties with CanonicalEncoderError code NON_ENUMERABLE_PROPERTY.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Existing canonical bytes and ordering for supported values remain unchanged.",
+        "evidence": "The accepted baseline reportedly contains no canonical encoder or ADR-009; this candidate introduces a 441-line encoder and a complete byte format. BLOCKER-0001 confirms that compatibility with an existing accepted encoding cannot be established under the task's amendment premise.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "The submitted verification evidence includes the exact npm run compile command output and exit code 0.",
+        "evidence": "The Implementer report records stdout lines '> ciclo@0.0.0 compile' and '> tsc -b tsconfig.json', empty stderr, and exit code 0.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "All repository lint, architecture-boundary, compile, and test gates exit successfully.",
+        "evidence": "The Implementer report records exit code 0 for compile, boundary, lint, and 99-test execution; automated validation independently confirms lint and 99/99 tests, and the test set includes boundary checks.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "SPEC_BLOCKERS.md records BLOCKER-0001 as OPEN and says Interpretation A—the interpretation implemented by this candidate—may only be accepted by the product owner. The same record states that the accepted baseline contains neither ADR-009 nor a CanonicalEncoder. Merely recording the contradiction does not authorize landing work that depends on one side of it.",
+        "id": "REVIEW-001",
+        "required_change": "Obtain and record the required product-owner resolution under CICLO_SPEC.md §19 before resubmitting this candidate. If Interpretation B is selected, restore the candidate to the narrow amendment task after the prerequisite encoder/ADR state is accepted through the proper task sequence.",
+        "severity": "BLOCKER",
+        "title": "Candidate depends on an unresolved TRAVADA interpretation"
+      },
+      {
+        "evidence": "Beyond non-enumerable-property rejection, the candidate creates the complete encoder and wire format, adds UNPAIRED_SURROGATE rejection across all string positions, changes admission of Array/Set/Map subclasses, adds package ESM configuration, and adds numerous tests for those rules. The original task excludes unrelated canonical-encoding changes and new byte-format work; BLOCKER-0001 acknowledges this is previously unaccepted scope.",
+        "id": "REVIEW-002",
+        "required_change": "After resolving BLOCKER-0001, limit the submitted change to the authorized baseline and the enumerability correction. Remove surrogate handling, collection-subclass policy, and other encoder-introduction work unless the product-owner resolution explicitly authorizes that combined scope.",
+        "severity": "MAJOR",
+        "title": "Candidate contains material changes outside the narrow task scope"
+      }
+    ],
+    "invariants_checked": [
+      "INV-22 injectivity for admitted plain objects with hidden properties",
+      "Deterministic UTF-8 object-key ordering",
+      "Canonical byte distinction between supported type tags",
+      "Accessor rejection without getter or setter invocation",
+      "Symbol-key rejection",
+      "Cycle rejection and DAG admission",
+      "Package-boundary and forbidden-API gates",
+      "No StateHash or SaveHash introduced"
+    ],
+    "risks": [
+      "Accepting an OPEN TRAVADA-dependent interpretation would silently choose a specification resolution reserved for the product owner.",
+      "The broad encoder and ADR would become the canonical foundation for future StateHash and SaveHash despite lacking authorized sequencing.",
+      "Unrelated supported-domain restrictions could constrain downstream state design without a task specifically authorizing those decisions."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [
+        "Introduction of the complete CanonicalEncoder and canonical byte format into an accepted baseline that had no encoder",
+        "UNPAIRED_SURROGATE policy and validation",
+        "Exact-prototype rejection for Array, Set, and Map subclasses",
+        "packages/core ESM-mode change needed by the newly introduced encoder/test surface",
+        "Broad ADR-009 creation beyond the required non-enumerable-property amendment"
+      ],
+      "within_scope": false
+    },
+    "summary": "The non-enumerable-property behavior is implemented and tested, but the candidate cannot become canonical while BLOCKER-0001 remains OPEN. It introduces the entire previously absent CanonicalEncoder and ADR-009, plus unrelated surrogate and collection-subclass rules, based on an interpretation that the blocker explicitly says requires product-owner resolution.",
+    "task_id": "TASK-0008",
+    "validation_assessment": {
+      "missing": [],
+      "sufficient": true
+    }
+  },
+  "review_iteration": 2,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0008"
+}

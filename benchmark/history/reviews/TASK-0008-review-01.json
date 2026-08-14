@@ -1,0 +1,112 @@
+{
+  "created_at": "2026-08-14T09:30:46.897863+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "For every admitted plain object, the encoder examines all own property descriptors rather than only enumerable keys.",
+        "evidence": "encodePlainObject uses Object.getOwnPropertyNames, Object.getOwnPropertySymbols, and Object.getOwnPropertyDescriptor for each own string name; focused tests cover top-level, nested, and null-prototype objects.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "A plain object with any non-enumerable own string-keyed data property causes CanonicalEncoderError.",
+        "evidence": "encodePlainObject checks descriptor.enumerable !== true and throws CanonicalEncoderError with code NON_ENUMERABLE_PROPERTY; tests 51, 54, 55, 57, and 62 passed.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "A plain object with any non-enumerable own string-keyed accessor property causes CanonicalEncoderError without invoking the accessor.",
+        "evidence": "The enumerability check operates on the descriptor before inspecting its value shape. Test 52 asserts NON_ENUMERABLE_PROPERTY and zero getter/setter invocation; test 56 independently checks the getter remains untouched.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "ADR-009 explicitly states that non-enumerable own properties are unsupported and identifies CanonicalEncoderError as the required outcome.",
+        "evidence": "ADR-009 sections 5 and 7 explicitly classify non-enumerable own data and accessor properties as unsupported and require CanonicalEncoderError code NON_ENUMERABLE_PROPERTY.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Existing canonical bytes and ordering for supported values remain unchanged.",
+        "evidence": "The accepted base contains only export {} in packages/core/src/index.ts, while this candidate introduces the complete 396-line encoder and a new byte format. There are therefore no accepted canonical bytes against which preservation was demonstrated, and the candidate additionally admits distinct strings that encode identically.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "The submitted verification evidence includes the exact npm run compile command output and exit code 0.",
+        "evidence": "The Implementer report records the exact command, stdout showing ciclo@0.0.0 compile and tsc -b tsconfig.json, empty stderr, and exit code 0.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "All repository lint, architecture-boundary, compile, and test gates exit successfully.",
+        "evidence": "Automated validation independently ran lint and test successfully, but did not run npm run compile or npm run boundary as standalone required gates. Their success appears only in the Implementer report, which the review instructions classify as evidence rather than truth.",
+        "status": "FAIL"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "encodeString passes arbitrary JavaScript strings directly to TextEncoder. UTF-8 TextEncoder replaces lone UTF-16 surrogates with U+FFFD, so distinct admitted values such as \"\\uD800\" and \"\\uD801\" produce identical payload bytes. The same issue affects encodingVersion. No rejection or well-formedness rule exists, and the tests contain no lone-surrogate collision coverage. This violates required invariant INV-22.",
+        "id": "REVIEW-001",
+        "required_change": "Within the encoder/ADR work being submitted, define and implement an injective string policy: either reject strings and encoding versions containing unpaired surrogates with a documented CanonicalEncoderError outcome, or specify an injective encoding of JavaScript UTF-16 code units. Add collision-focused tests for string values, object keys, and encodingVersion.",
+        "severity": "BLOCKER",
+        "title": "Canonical encoding is not injective for admitted strings"
+      },
+      {
+        "evidence": "ADR-009 section 5 says subclasses of Array, Set, or Map are rejected as UNSUPPORTED_TYPE. encodeValue instead admits Array subclasses through Array.isArray and Set/Map subclasses through instanceof. The Implementer report explicitly acknowledges this mismatch, and no subclass rejection tests exist.",
+        "id": "REVIEW-002",
+        "required_change": "Make implementation and ADR agree while preserving the supported-type boundary. Because the submitted ADR requires rejection, add exact-prototype validation for Array, Set, and Map subclasses and tests asserting CanonicalEncoderError with UNSUPPORTED_TYPE.",
+        "severity": "MAJOR",
+        "title": "Implementation contradicts ADR-009 on collection subclasses"
+      },
+      {
+        "evidence": "The original task requires amending ADR-009, preserving existing canonical bytes, and narrowly closing a defect, but the candidate base has no ADR-009 and packages/core/src/index.ts contains only export {}. The candidate therefore introduces the entire encoder and wire-format ADR from the previously unaccepted TASK-0007. The Implementer report calls this a pragmatic interpretation rather than documenting the contradiction through CICLO_SPEC.md section 19, and no blocker record is included.",
+        "id": "REVIEW-003",
+        "required_change": "Record and resolve the task-versus-accepted-state contradiction using the section 19 blocker process before landing work that depends on treating TASK-0008 as superseding TASK-0007. Then submit only the scope authorized by that resolution.",
+        "severity": "BLOCKER",
+        "title": "Task depends on an unresolved accepted-state contradiction without a blocker record"
+      },
+      {
+        "evidence": "Automated validation lists dependency-install, git-diff-check, lint, and test only. It does not contain npm run compile or npm run boundary command executions and exit codes. The Implementer report alone claims those runs.",
+        "id": "REVIEW-004",
+        "required_change": "Run npm run compile and npm run boundary against the final candidate and include their exact command output, stderr, and exit code 0 in validation evidence.",
+        "severity": "MAJOR",
+        "title": "Required compile and boundary validation are not independently present"
+      }
+    ],
+    "invariants_checked": [
+      "INV-22 injectivity for admitted canonical values",
+      "Deterministic UTF-8 byte ordering for supported plain-object keys",
+      "Non-enumerable own data-property rejection",
+      "Non-enumerable accessor rejection without invocation",
+      "Enumerable accessor and symbol-key rejection paths",
+      "Cycle rejection and DAG admission",
+      "No StateHash or SaveHash introduction",
+      "Package-boundary and forbidden-API gates",
+      "ADR-009 supported-type consistency"
+    ],
+    "risks": [
+      "Distinct admitted states can produce identical canonical bytes, making any downstream StateHash unsafe.",
+      "Runtime supported types differ from the accepted ADR contract, allowing user-defined collection subclass behavior into deterministic encoding.",
+      "Accepting this candidate would silently resolve a benchmark/specification contradiction and effectively land previously rejected TASK-0007 scope.",
+      "Required gate claims are not fully corroborated by automated validation."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [
+        "The complete canonical encoder, ten-tag wire format, collection semantics, numeric rules, cycle handling, public API, and full ADR-009 were introduced over an accepted base containing no encoder or ADR, rather than applying only the assigned non-enumerable-property correction.",
+        "packages/core/package.json was changed to ESM as supporting work for the newly introduced full encoder."
+      ],
+      "within_scope": false
+    },
+    "summary": "The non-enumerable-property behavior itself is implemented and tested, but the candidate cannot safely become canonical: the newly introduced encoder violates INV-22 for distinct JavaScript strings containing lone surrogates, contradicts ADR-009 regarding collection subclasses, expands a narrow correction into the entire previously unaccepted encoder without the required specification-blocker handling, and lacks automated evidence for every required gate.",
+    "task_id": "TASK-0008",
+    "validation_assessment": {
+      "missing": [
+        "Independent npm run compile output and exit code",
+        "Independent npm run boundary output and exit code",
+        "Lone-surrogate injectivity tests",
+        "Array, Set, and Map subclass rejection tests"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 1,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0008"
+}

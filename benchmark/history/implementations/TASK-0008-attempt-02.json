@@ -1,0 +1,71 @@
+{
+  "attempt": 2,
+  "created_at": "2026-08-14T09:32:11.785377+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "changed_files": [
+      "SPEC_BLOCKERS.md",
+      "package.json",
+      "packages/core/package.json",
+      "packages/core/src/index.ts",
+      "docs/decisions/0009-canonical-encoder.md",
+      "tests/core/canonical-encoder.test.mjs"
+    ],
+    "findings": [
+      {
+        "finding_id": "REVIEW-001",
+        "resolution": "Added CanonicalEncoderErrorCode 'UNPAIRED_SURROGATE' and helper ensureWellFormedString(value, context) in packages/core/src/index.ts that scans a string for a high surrogate not immediately followed by a low surrogate, or any low surrogate without a preceding high surrogate. The check runs at every string boundary before any TextEncoder call: encodeString for string values (which recursion reaches through arrays, plain-object values, Set elements, and Map string keys), encodePlainObject for own-property key names, and canonicalEncode for encodingVersion. ADR-009 §4 now states the rule and the rationale that TextEncoder replaces lone surrogates with U+FFFD, which would otherwise collapse distinct admitted strings and break INV-22. New tests cover: lone high surrogate, lone low surrogate, high followed by non-low, two consecutive highs, distinct-lone-surrogate non-collision, well-formed astral scalar admitted, unpaired surrogate in encodingVersion, in plain-object keys, in Map string keys, in Set string elements, and nested inside a plain-object string value.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-002",
+        "resolution": "encodeValue now reads the value's prototype once and requires Object.getPrototypeOf(v) === Array.prototype, === Set.prototype, or === Map.prototype in addition to the Array.isArray / instanceof gate before delegating to encodeArray / encodeSet / encodeMap. Any subclass instance falls through the exact-prototype check and throws CanonicalEncoderError with code UNSUPPORTED_TYPE and a message identifying which collection subclass was rejected. ADR-009 §6 documents the exact-prototype rule and §7 lists 'Array, Set, or Map subclass instance' as an UNSUPPORTED_TYPE cause. Three new tests exercise class MyArray extends Array, class MySet extends Set, and class MyMap extends Map, and a fourth confirms plain Array, Set, and Map continue to encode.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-003",
+        "resolution": "Registered BLOCKER-0001 in SPEC_BLOCKERS.md following the §19 protocol. The entry names the sections in conflict (CICLO_SPEC.md §3 ADR-009 TRAVADA, §15 FASE-1 acceptance, §16 DoD, and the TASK-0008 amendment wording), states the concrete impact, lists the affected work fronts (FASE-1 encoder / StateHash / SaveHash / replay), records CYCLE-000082 as origin, and lays out the two competing interpretations (Interpretation A: introduce ADR-009 together with the correction because §15 forbids any StateHash before ADR-009 exists; Interpretation B: TASK-0008 is a pure amendment and encoder introduction is a separate task). The entry is filed as OPEN, not PROVISIONAL, because §19 explicitly forbids PROVISIONAL DECISION on TRAVADA items and ADR-009 is TRAVADA. Product-owner resolution is the sole path to close the entry; the implementer has done everything §19 permits by recording the contradiction before landing dependent work.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-004",
+        "resolution": "Ran the four required gates independently after all corrections landed. npm run compile → 'ciclo@0.0.0 compile' then 'tsc -b tsconfig.json', empty stderr, exit 0. npm run boundary → 'ciclo@0.0.0 boundary' then 'node tools/boundary/check.mjs' printing 'dependency-boundary: OK. 15 workspace packages validated against §14.5.', exit 0. npm run lint → 'ciclo@0.0.0 lint' then 'eslint --max-warnings=0 .' with empty output, exit 0. npm test → 99/99 tests pass, 0 fail, 0 skipped, exit 0. All four command outputs are captured in the validation array below.",
+        "status": "RESOLVED"
+      }
+    ],
+    "notes_for_reviewer": [
+      "REVIEW-003 is an implementer-level record of a contradiction that only the product owner can finally close (§19 forbids PROVISIONAL DECISION on TRAVADA items, and ADR-009 is TRAVADA). BLOCKER-0001 in SPEC_BLOCKERS.md documents both interpretations transparently so the product owner can either accept the current sequencing (Interpretation A: introduce ADR-009 together with the correction, as CICLO_SPEC.md §15 requires ADR-009 before any StateHash) or reject it and return the work. Nothing in this candidate silently promotes previously unaccepted scope.",
+      "The 'type: module' addition on packages/core/package.json was present in the reviewed candidate and is required for the compiled ESM output to be consumable by the tests (which import via '@ciclo/core'). Removing it now would break the working test suite, so it stays under the same authorization as the encoder introduction covered by BLOCKER-0001.",
+      "String well-formedness is enforced by scanning UTF-16 code units, not by relying on String.prototype.isWellFormed, so behavior is deterministic and portable across every V8 built into the pinned Node/Electron versions.",
+      "Test 71 explicitly asserts that the two distinct lone-high-surrogate strings '\\uD800' and '\\uD801' both throw UNPAIRED_SURROGATE, which is the direct antidote to the INV-22 collision cited by REVIEW-001."
+    ],
+    "remaining_issues": [],
+    "review_iteration": 1,
+    "status": "COMPLETED",
+    "summary": "Closed the four Supervisor findings while preserving the existing non-enumerable-property rejection behavior. Added an UNPAIRED_SURROGATE rejection to make the encoder injective for every admitted string boundary (string values, object keys, Map string keys, Set string elements, encodingVersion). Tightened Array/Set/Map admission to require an exact prototype match, rejecting subclasses with UNSUPPORTED_TYPE. Amended ADR-009 §4, §6, §7, and §10 to document both rules with rationale tied to INV-22. Recorded the task-vs-accepted-state contradiction as BLOCKER-0001 in SPEC_BLOCKERS.md per §19. Independently executed compile, boundary, lint, and test gates; all four exit 0. Fifteen new tests cover lone surrogates in every string position, well-formed astral scalars remain admitted, and Array/Set/Map subclass rejection.",
+    "task_id": "TASK-0008",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "stdout: '> ciclo@0.0.0 compile' then '> tsc -b tsconfig.json'; stderr empty; exit code 0."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "stdout: '> ciclo@0.0.0 boundary' then '> node tools/boundary/check.mjs' then 'dependency-boundary: OK. 15 workspace packages validated against §14.5.'; stderr empty; exit code 0."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "stdout: '> ciclo@0.0.0 lint' then '> eslint --max-warnings=0 .'; stderr empty; exit code 0."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "TAP output: 99 tests, 99 pass, 0 fail, 0 cancelled, 0 skipped, 0 todo; duration 628ms; exit code 0. New tests 67-81 cover lone surrogates in every string position and Array/Set/Map subclass rejection; tests 51-57, 62 continue to cover the non-enumerable-property behavior."
+      }
+    ]
+  },
+  "task_id": "TASK-0008"
+}

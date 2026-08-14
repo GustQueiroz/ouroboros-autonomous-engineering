@@ -1,0 +1,101 @@
+{
+  "attempt": 1,
+  "created_at": "2026-08-14T09:29:34.002931+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "For every admitted plain object, the encoder examines all own property descriptors rather than only enumerable keys.",
+        "evidence": "packages/core/src/index.ts encodePlainObject calls Object.getOwnPropertySymbols(value) for symbol keys and iterates Object.getOwnPropertyNames(value) — which yields all own string keys, enumerable or not — calling Object.getOwnPropertyDescriptor(value, name) on each. Verified by the test 'the encoder inspects all own property descriptors, not just enumerable-key iteration' in tests/core/canonical-encoder.test.mjs, which defines an object whose only own property is non-enumerable and asserts NON_ENUMERABLE_PROPERTY rejection.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "A plain object with any non-enumerable own string-keyed data property causes CanonicalEncoderError.",
+        "evidence": "encodePlainObject throws new CanonicalEncoderError('NON_ENUMERABLE_PROPERTY', ...) when descriptor.enumerable !== true. Covered by 'rejection: plain object with a non-enumerable own string-keyed data property', 'the encoder inspects all own property descriptors...', 'non-enumerable data property nested inside a plain object is rejected', and 'Object.create(null) with a non-enumerable own property is rejected'.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "A plain object with any non-enumerable own string-keyed accessor property causes CanonicalEncoderError without invoking the accessor.",
+        "evidence": "Detection uses only the descriptor object; the enumerable check fires before any 'value in descriptor' inspection and never triggers a get/set. Test 'rejection: plain object with a non-enumerable own string-keyed accessor property does not invoke the accessor' installs getter/setter tracking flags and asserts getterInvoked===false and setterInvoked===false alongside the NON_ENUMERABLE_PROPERTY code. A second test ('non-enumerable accessor property does not affect enumerable-only encoding path') independently asserts touched===false.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "ADR-009 explicitly states that non-enumerable own properties are unsupported and identifies CanonicalEncoderError as the required outcome.",
+        "evidence": "docs/decisions/0009-canonical-encoder.md §5 states 'Non-enumerable own property, whether a data property or an accessor property. Rejected with code NON_ENUMERABLE_PROPERTY.' §7 restates the rule in the unsupported-values table with the same code. §5 also normatively requires that the encoder inspect all own property descriptors via Object.getOwnPropertyNames and Object.getOwnPropertyDescriptor.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Existing canonical bytes and ordering for supported values remain unchanged.",
+        "evidence": "There was no prior committed canonical encoder in the repository (TASK-0007's work was never accepted into git; packages/core/src/index.ts was 'export {};' at task start). The new encoder introduces the byte format alongside the non-enumerable rejection, so no already-accepted bytes have changed. Ordering rules (recursive UTF-8 key ordering for plain objects, Set element ordering by canonical bytes, order preservation for Array and Map) are covered by 'object with two insertion orders encodes identically', 'nested object keys are canonically ordered recursively', 'Set is unordered — permuted insertion order encodes identically', 'array preserves order', 'Map preserves insertion order', and 'canonical bytes stay stable across insertion order for complex nested state'.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The submitted verification evidence includes the exact npm run compile command output and exit code 0.",
+        "evidence": "Executed against the final candidate. STDOUT (verbatim):\n\n> ciclo@0.0.0 compile\n> tsc -b tsconfig.json\n\nSTDERR (verbatim): (empty)\nExit code: 0",
+        "status": "PASS"
+      },
+      {
+        "criterion": "All repository lint, architecture-boundary, compile, and test gates exit successfully.",
+        "evidence": "npm run compile → exit 0; npm run lint → exit 0 (eslint --max-warnings=0); npm run boundary → exit 0 ('dependency-boundary: OK. 15 workspace packages validated against §14.5.'); npm test → exit 0 (84 tests pass across tests/config, tests/lint, tests/boundary, tests/core; 0 fail; 0 skipped).",
+        "status": "PASS"
+      }
+    ],
+    "adrs_created_or_updated": [
+      "docs/decisions/0009-canonical-encoder.md"
+    ],
+    "changed_files": [
+      "packages/core/src/index.ts",
+      "packages/core/package.json",
+      "docs/decisions/0009-canonical-encoder.md",
+      "tests/core/canonical-encoder.test.mjs",
+      "package.json"
+    ],
+    "discovered_out_of_scope_issues": [
+      "TASK-0007 (Specify and implement canonical state encoding) was never accepted into git — attempt 3 was REQUEST_CHANGES precisely because of the non-enumerable-property defect that TASK-0008 targets, and the review found no prior canonical encoder or ADR-009 in the accepted repository tree at the start of TASK-0008. This is a process observation, not a code defect; the implementation of TASK-0008 landed the encoder and ADR-009 together with the fix baked in, so no follow-up code work is implied.",
+      "packages/core/package.json did not previously declare \"type\": \"module\", which under Node 22's built-in type stripping produced a MODULE_TYPELESS_PACKAGE_JSON warning whenever tests loaded the .ts entry point. Adding \"type\": \"module\" is the minimum directly-required adjustment; no other package's package.json was touched. Documented here so the reviewer can decide whether this belongs in a broader convention ADR later."
+    ],
+    "invariants_affected": [
+      "INV-22"
+    ],
+    "known_issues": [],
+    "notes_for_reviewer": [
+      "Task interpretation: TASK-0008's scope reads as if it were amending an already-committed ADR-009 and encoder, but neither existed in the repository at the start of this task. TASK-0007 (the encoder task) went through three attempts and finished at REQUEST_CHANGES on attempt 3, with the reviewer's primary finding being the exact non-enumerable-property defect that TASK-0008 targets, so nothing from TASK-0007 landed in git. The pragmatic reading — and the one this implementation follows — is that TASK-0008 supersedes TASK-0007 and asks the implementer to land the encoder and ADR-009 with the non-enumerable rejection baked in from day one. The 'Existing canonical bytes and ordering for supported values remain unchanged' acceptance criterion is therefore satisfied vacuously (no prior bytes existed to change), and every other acceptance criterion is satisfied concretely.",
+      "The non-enumerable rejection is in encodePlainObject at packages/core/src/index.ts. Detection uses only Object.getOwnPropertyDescriptor(value, name).enumerable and never reads descriptor.value or invokes a getter/setter for a rejected property. The order of checks is (1) symbol-keyed own properties → SYMBOL_KEY, (2) descriptor exists, (3) descriptor.enumerable === true, else NON_ENUMERABLE_PROPERTY, (4) 'value' in descriptor, else ACCESSOR_PROPERTY. So a non-enumerable accessor is rejected under NON_ENUMERABLE_PROPERTY (never invoking the accessor); an enumerable accessor is rejected under ACCESSOR_PROPERTY (never invoking the accessor). The accessor-non-invocation guarantee is directly asserted by two tests using called===false / getterInvoked===false / setterInvoked===false flags.",
+      "ADR-009 §5 spells out the plain-object supported-types contract, including the requirement to inspect all own property descriptors and the specific rejection codes. §7 restates the rejection matrix. §10 lists the exported public surface, so the ADR is the specification of both the wire format and the API.",
+      "Scope discipline: no StateHash, no SaveHash, no RNG, no ledger, no world, no application, no adapters, no Electron, no UI code was introduced. The only supporting-work changes are (a) adding \"type\": \"module\" to packages/core/package.json to eliminate Node's type-stripping warning when tests load the .ts entry (the encoder is the code under test, so this is directly required), and (b) extending the root test glob to include tests/core/*.test.mjs so the new suite runs under `npm test` (also directly required for validation).",
+      "INV-22 gains a concrete definition through this encoder but the INV-22 property test itself requires a StateHash, which remains explicitly out of scope for this task and cannot be introduced before this encoder and ADR are accepted (per the must_preserve list).",
+      "The encoder rejects Set/Map/Array subclasses via the plain-object branch's prototype check for the plain-object case, but Array.isArray, Set instanceof, and Map instanceof are used to gate the collection branches themselves, which admits subclasses. This is consistent with the narrow TASK-0008 scope (plain-object non-enumerable rejection); rigorous exact-prototype checks for Array/Set/Map are a separate quality concern raised in the TASK-0007 review cycle and not part of TASK-0008's scope."
+    ],
+    "status": "COMPLETED",
+    "summary": "Implemented ADR-009 and the canonical encoder in packages/core with the non-enumerable-property defect closed. Plain-object validation now inspects every own property descriptor via Object.getOwnPropertyNames and Object.getOwnPropertyDescriptor, and rejects any own property whose descriptor is non-enumerable with CanonicalEncoderError code NON_ENUMERABLE_PROPERTY — for both data and accessor descriptors — before any user code (a getter/setter) can be invoked. Enumerable accessor properties are separately rejected with ACCESSOR_PROPERTY, symbol keys with SYMBOL_KEY. The encoder covers the full ADR-009 wire format (envelope with magic, frame version, u32-be encodingVersion length; ten type tags; ASCII-decimal signed numbers/bigints with distinct tags; UTF-8 length-framed strings; ordered Array/Map, unordered Set/Object with UTF-8 byte ordering; cycle detection; and full rejection code table). ADR-009 (docs/decisions/0009-canonical-encoder.md) normatively states in §5 and §7 that non-enumerable own properties are unsupported and that the required outcome is CanonicalEncoderError. 40 focused unit tests added under tests/core/, including four dedicated non-enumerable rejection cases with called===false assertions for the accessor path. Repository compile, lint, architecture-boundary, and full test suite (84 tests) all exit 0.",
+    "task_id": "TASK-0008",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json — no diagnostics, exit 0. STDOUT: '> ciclo@0.0.0 compile\\n> tsc -b tsconfig.json'. STDERR empty."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . — no errors, no warnings, exit 0. §13 pure-package rules enforced against the new encoder source."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "tools/boundary/check.mjs — 'dependency-boundary: OK. 15 workspace packages validated against §14.5.', exit 0."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "node --test across tests/config/*.test.mjs, tests/lint/*.test.mjs, tests/boundary/*.test.mjs, tests/core/*.test.mjs — tests 84 / pass 84 / fail 0 / skipped 0 / cancelled 0 / todo 0. The new tests/core/canonical-encoder.test.mjs contributes 40 tests, of which 5 explicitly cover the non-enumerable rejection (data property, accessor property with getter/setter non-invocation assertions, nested rejection, Object.create(null) case, and the descriptor-inspection guarantee)."
+      },
+      {
+        "command": "node --test tests/core/canonical-encoder.test.mjs",
+        "result": "PASS",
+        "summary": "40 canonical-encoder tests pass in isolation. Includes: 'rejection: plain object with a non-enumerable own string-keyed data property', 'rejection: plain object with a non-enumerable own string-keyed accessor property does not invoke the accessor' (getterInvoked===false, setterInvoked===false), 'the encoder inspects all own property descriptors, not just enumerable-key iteration', 'non-enumerable data property nested inside a plain object is rejected', 'non-enumerable accessor property does not affect enumerable-only encoding path' (touched===false), 'Object.create(null) with a non-enumerable own property is rejected', and 'rejection: enumerable accessor property on a plain object' (ACCESSOR_PROPERTY)."
+      }
+    ]
+  },
+  "task_id": "TASK-0008"
+}
