@@ -1,0 +1,74 @@
+{
+  "created_at": "2026-08-14T13:47:47.510182+00:00",
+  "decision": "APPROVE",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "packages/core/src/index.mts exports branded TypeScript types Money, Quantity, Price, Rate, and Tick.",
+        "evidence": "index.mts publicly re-exports all five types from nominal-types.mjs; nominal-types.mts defines distinct bigint or number intersection brands.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "packages/core/src/index.mts exports QUANTITY_SCALE as 100_000_000n, PRICE_SCALE as 10_000n, and RATE_SCALE as 100_000_000n, with bigint literal types preserved where supported by existing conventions.",
+        "evidence": "nominal-types.mts declares the three values as const bigint literals with the exact required values, and index.mts re-exports them. Runtime tests verify both bigint type and exact value.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Money, Quantity, Price, and Rate constructors reject non-bigint inputs and accept bigint inputs without precision conversion.",
+        "evidence": "Each public asX constructor passes its input through assertBigint and returns the original bigint value. Tests cover zero, negative, very large bigint values, and representative non-bigint runtime inputs for all four constructors.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Tick validation accepts 0 and Number.MAX_SAFE_INTEGER and rejects every specified invalid category.",
+        "evidence": "asTick checks number type, NaN, both infinities, integer status, and the inclusive 0..Number.MAX_SAFE_INTEGER range. Tests explicitly cover both boundaries, -1, MAX_SAFE_INTEGER + 1, fractional values, NaN, infinities, bigint, string, null, and undefined, plus additional invalid types.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Compile-time fixtures demonstrate primitive and cross-brand assignment rejection and constructor-produced value acceptance.",
+        "evidence": "__nominal_types_typecheck__.mts contains positive assignments from every constructor and @ts-expect-error assertions for direct bigint/number assignments and representative cross-brand assignments, including bigint brands versus Tick. The strict compile completed without diagnostics.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No packages/core import is introduced, and the repository boundary checker remains green.",
+        "evidence": "The new core implementation has no imports, while the type fixture imports only local core modules. The reported standalone boundary command returned 'dependency-boundary: OK. 15 workspace packages validated against §14.5.'",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The full existing test suite, strict TypeScript build/typecheck, lint suite, determinism-lint fixtures, and boundary validation remain green.",
+        "evidence": "Automated validation reports lint PASS and 166/166 tests passing with no skips; tests 149–166 include determinism-lint fixtures. The test lifecycle runs the compile pretest, and the implementer additionally reports standalone compile and boundary commands passing.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "APPROVE",
+    "findings": [],
+    "invariants_checked": [
+      "CanonicalEncoder exports and implementation remain unchanged.",
+      "ADR-003 bigint representation is preserved for Money, Quantity, Price, and Rate; no floating-point conversion is introduced.",
+      "INV-23 is enforced by asTick's integer and inclusive safe-range validation.",
+      "INV-26 is preserved because packages/core introduces no external or workspace imports and boundary validation passes.",
+      "Scale constants use exact bigint literals and require no arithmetic or rounding policy.",
+      "Runtime validation is deterministic and has no I/O, clock, randomness, mutable state, or environment dependency.",
+      "Replay/state hashing behavior is unaffected because CanonicalEncoder behavior is unchanged and no replay state is introduced.",
+      "No ledger behavior or ledger invariants are changed.",
+      "No validation configuration, test expectation, lint rule, or boundary rule is weakened.",
+      "Failure paths use deterministic typed errors with stable codes.",
+      "No relevant security or performance regression is introduced; validation is constant-time and operates directly on primitives.",
+      "No ADR or blocker record is required because the implementation follows the locked representation without resolving a specification contradiction.",
+      "No temporary or debug artifacts are present in the candidate scope."
+    ],
+    "risks": [],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The candidate fully implements the requested nominal economic types, fixed scales, runtime validation, brand-isolation fixtures, and public exports while preserving core boundaries and deterministic behavior. Automated and reported repository validation is sufficient and green.",
+    "task_id": "TASK-0011",
+    "validation_assessment": {
+      "missing": [],
+      "sufficient": true
+    }
+  },
+  "review_iteration": 2,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0011"
+}

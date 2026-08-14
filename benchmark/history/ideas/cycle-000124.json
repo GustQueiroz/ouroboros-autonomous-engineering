@@ -1,0 +1,149 @@
+{
+  "created_at": "2026-08-14T13:55:41.799542+00:00",
+  "cycle_id": "CYCLE-000124",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "packages/core exports rand(masterSeed: bigint, namespace: string, ...coordinates: readonly (bigint | number)[]): bigint as a pure function with no mutable global state",
+          "ADR-002 document written specifying the chosen hash algorithm (e.g. SipHash-1-3 or equivalent), justifying uniform distribution and avalanche properties",
+          "Tests confirm same (seed, namespace, coordinates) triple always returns the same uint64 value",
+          "Tests confirm different namespaces with identical coordinates produce different values",
+          "Tests confirm rand(seed, 'market.trend', assetId, octave, 9_000_000) equals the value reached by advancing one tick at a time — the most important test per ADR-002",
+          "No Math.random, Date, crypto entropy, or mutable state; determinism lint remains green",
+          "All CI gates (compile, lint, boundary, test) pass"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "INV-01",
+          "INV-02",
+          "INV-22",
+          "CICLO_SPEC.md §15 FASE-1 acceptance"
+        ],
+        "title": "Implement positional RNG rand() in packages/core + write ADR-002",
+        "why_now": "rand() is the only missing dependency-free primitive in packages/core. Every downstream FASE-1 deliverable that involves any randomness — world price generation, bot decisions, macro events — cannot be built until this pure function exists. INV-02 (same coordinates always produce the same value regardless of call order) and the FASE-1 acceptance invariants INV-01, INV-22 cannot be tested without it. It has no dependencies beyond the already-complete packages/core."
+      },
+      {
+        "acceptance_targets": [
+          "packages/core exports divTruncate, divRoundHalfUp, divRoundHalfEven as pure bigint functions",
+          "ADR-004 document written, resolving the DEFINIR: specifies whether lint rule or TypeScript opaque wrapper is used to block bare / and % operators on domain types",
+          "Tests verify each mode against known positive and negative operand pairs, including boundary cases where remainder is exactly half the divisor",
+          "Rounding residue contract documented: callers are responsible for posting the residue to world:rounding_residue:<COMMODITY>",
+          "All CI gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-004",
+          "INV-07",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "CICLO_SPEC.md §15 FASE-1 acceptance"
+        ],
+        "title": "Implement bigint division helpers with explicit rounding modes + resolve ADR-004 DEFINIR + write ADR-004",
+        "why_now": "ADR-004 prohibits implicit division: every bigint division must declare TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, or ROUND_HALF_EVEN. The ADR contains an open DEFINIR marker on how this is technically enforced. Without the helpers and enforcement decision, no economic calculation (fee, funding, effective price, liquidation price) can be correctly implemented. This blocks the ledger, world price, and all downstream FASE-1 work. It has no dependencies beyond nominal types, which are already complete."
+      },
+      {
+        "acceptance_targets": [
+          "packages/world exports worldPrice(masterSeed: bigint, assetId: string, tick: Tick): Price as a pure function",
+          "At least 2 distinct assetIds supported (e.g. BTC and ETH denominated in USDT)",
+          "At least 2 noise layers composited (e.g. slow trend octave and fast volatility octave) using market.trend and/or market.factor namespaces from ADR-002 namespace table",
+          "worldPrice(seed, asset, tick) called directly on tick 9_000_000 returns the identical value as reached by stepping one tick at a time — INV-02 property test",
+          "Player action log does not influence the return value of worldPrice for any tick — INV-03 test",
+          "packages/world imports only packages/core; boundary checker remains green",
+          "All CI gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "ADR-005",
+          "ADR-007",
+          "INV-02",
+          "INV-03",
+          "INV-22",
+          "CICLO_SPEC.md §15 FASE-1 acceptance"
+        ],
+        "title": "Implement world price generator in packages/world (2 assets, 2 noise layers)",
+        "why_now": "The world price generator is the first concrete game-logic deliverable and unlocks all downstream tick-level testing. FASE-1 acceptance requires it (price generator with 2 noise layers and 2 assets). INV-03 (player actions do not alter world prices) cannot be tested until the world price function exists as a pure positional function. It depends on rand() (IDEA-001), which is the only blocker."
+      },
+      {
+        "acceptance_targets": [
+          "packages/domain exports an immutable ledger entry type and a post function that accepts a balanced set of entries per commodity",
+          "Balance invariant enforced: sum of all amounts per commodity across all entries in any valid transaction equals zero — violation throws at post time",
+          "System accounts defined: world:counterparty_cash, world:insurance_fund, world:rounding_residue:<COMMODITY>",
+          "Tests cover INV-04 (no spontaneous creation), INV-05 (no spontaneous destruction), INV-06 (ledger closes after every tick), INV-07 (rounding residue in world:rounding_residue:<COMMODITY> matches exact truncation difference)",
+          "No SQLite or mutable global state; ledger is a pure append-only log; INV-27 respected",
+          "packages/domain imports only packages/core; boundary checker remains green",
+          "All CI gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-27",
+          "ADR-004",
+          "ADR-006",
+          "CICLO_SPEC.md §10 ledger accounts",
+          "CICLO_SPEC.md §15 FASE-1 acceptance"
+        ],
+        "title": "Implement multi-commodity double-entry ledger in packages/domain",
+        "why_now": "The ledger is the economic core of CICLO. FASE-1 acceptance requires it, and INV-04 through INV-07 (no value created or destroyed, rounding residue fully accounted for per commodity) are untestable without it. It is a prerequisite for market orders, liquidation, and the tick loop. It depends only on division helpers (IDEA-002) and nominal types, both of which will be complete."
+      },
+      {
+        "acceptance_targets": [
+          "GitHub Actions CI produces a Windows .exe or .msi installer and a Linux .AppImage or .deb artifact on every successful build",
+          "Electron app opens a window without crashing on both platforms",
+          "INV-29 security constraints enforced: nodeIntegration false, contextIsolation true, sandbox true in BrowserWindow config",
+          "apps/desktop/main, preload, and renderer packages compile as part of the existing npm run compile gate",
+          "No native modules that require per-platform recompilation are introduced unless unavoidable, and if introduced are documented in an ADR",
+          "All existing CI gates (compile, lint, boundary, test) continue to pass"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "CICLO_SPEC.md §15 FASE-1 acceptance",
+          "CICLO_SPEC.md §15 sequenciamento travado (installer locking note)",
+          "INV-29"
+        ],
+        "title": "Add minimal Electron installer produced by CI (Windows + Linux)",
+        "why_now": "The spec explicitly locks the sequencing: the installer must exist in FASE-1, not at the end. Delaying it until FASE-7 risks discovering native module ABI mismatches, path resolution failures, and cross-platform packaging incompatibilities too late to fix architecturally. An empty-window installer that ships from CI today satisfies the requirement and de-risks the entire delivery. No game logic is required; the app can open a blank window."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold complete with 4 blocking CI gates (compile, lint, boundary, test). packages/core has CanonicalEncoder (ADR-009) and nominal types (Money, Quantity, Price, Rate, Tick with scale constants). All other packages are empty stubs. No game logic exists.",
+      "highest_priority_gap": "Positional RNG (ADR-002) is absent from packages/core, blocking world price generation, replay determinism tests (INV-01, INV-02), and all tick-level randomness. Division helpers (ADR-004) are also absent, blocking any bigint arithmetic in domain and world layers."
+    },
+    "warnings": [
+      "ADR-002 defines the rand() function signature and namespace table but does not specify the underlying hash algorithm. The Implementer must choose and document a concrete algorithm (e.g. SipHash-1-3, xxHash3, or a keyed hash cascade). The choice is irrevocable without bumping rulesetVersion and rulesetVersion bump requires a save migration path. A poor choice — one with correlations between nearby coordinates or non-uniform output distribution — could silently compromise game fairness without triggering any determinism test.",
+      "ADR-004 contains an open DEFINIR marker: the spec mandates that calling division without an explicit rounding mode is a compile-time error or blocking lint, but does not specify whether this is enforced via a lint rule (forbidding bare / and % on branded bigint types) or a TypeScript opaque-type wrapper. This decision must be resolved before division helpers can be correctly enforced. If left unresolved, the enforcement mechanism could be implemented inconsistently and later require a breaking refactor across all arithmetic sites."
+    ]
+  }
+}

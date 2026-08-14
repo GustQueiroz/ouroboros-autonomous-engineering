@@ -1,0 +1,82 @@
+{
+  "created_at": "2026-08-14T13:46:03.105465+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "packages/core/src/index.mts exports branded TypeScript types Money, Quantity, Price, Rate, and Tick.",
+        "evidence": "The candidate index.mts re-exports all five types, and nominal-types.mts defines distinct primitive intersections using unique __ciclo_brand literals.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "packages/core/src/index.mts exports the three required bigint scale constants with literal types preserved.",
+        "evidence": "nominal-types.mts declares QUANTITY_SCALE = 100_000_000n, PRICE_SCALE = 10_000n, and RATE_SCALE = 100_000_000n as const bindings, and index.mts re-exports them.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Money, Quantity, Price, and Rate construction accepts bigint inputs unchanged and rejects non-bigint runtime inputs.",
+        "evidence": "Each public as* function calls assertBigint and returns the original bigint by type assertion without conversion. Runtime tests cover bigint values and multiple non-bigint categories.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Tick construction enforces the inclusive safe non-negative integer range and rejects all specified invalid inputs.",
+        "evidence": "asTick checks runtime type, NaN, both infinities, integer status, and range 0 through Number.MAX_SAFE_INTEGER. Tests include every boundary and invalid category required by the task.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Compile-time fixtures demonstrate primitive and cross-brand isolation, with positive constructor cases.",
+        "evidence": "__nominal_types_typecheck__.mts contains positive assignments for all constructors and @ts-expect-error cases covering direct primitives, economic cross-brand assignments, and Tick/economic cross-brand assignments.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No packages/core dependency is introduced and the package-boundary checker remains green.",
+        "evidence": "The supplied source diff introduces only an internal relative import, but automated validation contains no boundary-command execution. The Implementer report's summarized npm run boundary claim is not accompanied by independently verifiable command output.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "The full test suite, strict TypeScript build/typecheck, lint, determinism fixtures, and boundary validation remain green.",
+        "evidence": "Automated validation proves lint and 166 tests pass, including determinism-lint fixtures. It explicitly warns that no build or typecheck script was run and contains no npm run compile or npm run boundary validation section.",
+        "status": "FAIL"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "The task expressly requires strict compile/typecheck and package-boundary validation. Automated validation ran dependency installation, diff-check, lint, and tests only; its warnings state that no typecheck or build script exists, and it reports no compile or boundary command. The Implementer report merely summarizes alleged npm run compile and npm run boundary results without their actual output.",
+        "id": "REVIEW-001",
+        "required_change": "Run the repository's actual strict compilation command (`npm run compile`) and package-boundary command (`npm run boundary`) against the candidate state and provide successful command output. Address any failures without weakening compiler or boundary configuration.",
+        "severity": "MAJOR",
+        "title": "Required compile and boundary validation are not independently evidenced"
+      }
+    ],
+    "invariants_checked": [
+      "CanonicalEncoder source and exports are unchanged except for additive index exports.",
+      "ADR-003 bigint representation is preserved for Money, Quantity, Price, and Rate.",
+      "INV-23 is enforced by Tick runtime validation over 0 through Number.MAX_SAFE_INTEGER.",
+      "INV-26 is structurally preserved by the shown source imports, but its required checker result is not independently evidenced.",
+      "Scale constants use exact bigint literals without floating-point conversion.",
+      "Runtime construction is deterministic and introduces no I/O, time, randomness, or mutable state.",
+      "No ledger, rounding, replay, or state-hash behavior is introduced or modified."
+    ],
+    "risks": [
+      "Without strict compilation evidence, the compile-time nominal-brand fixture and emitted public declarations are not proven green by automated validation.",
+      "Without boundary-check output, preservation of the repository's enforced INV-26 gate is not proven."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The implementation appears technically consistent with the task, but required validation is not sufficiently evidenced. Automated validation did not run the strict compile/typecheck or package-boundary commands, and the Implementer report supplies assertions rather than command output that can be independently verified.",
+    "task_id": "TASK-0011",
+    "validation_assessment": {
+      "missing": [
+        "Successful raw output from `npm run compile` or the repository's strict equivalent",
+        "Successful raw output from `npm run boundary`"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 1,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0011"
+}

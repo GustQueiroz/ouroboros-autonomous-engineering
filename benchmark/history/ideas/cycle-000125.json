@@ -1,0 +1,149 @@
+{
+  "created_at": "2026-08-14T13:58:59.673819+00:00",
+  "cycle_id": "CYCLE-000125",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR filed in docs/decisions/ specifying the hash algorithm bit-by-bit (input format, step-by-step computation, output width of 64 bits), namespace isolation mechanism, argument encoding, and at least two test vectors with known inputs and expected outputs.",
+          "rand(masterSeed: bigint, namespace: string, ...coordinates: number[]): bigint is a pure function with no module-level state; identical arguments always return identical output.",
+          "All eleven namespaces from the spec table are defined as typed string constants exported from packages/core.",
+          "Property test: rand called 10_000 times with identical arguments returns the same value each time.",
+          "Property test: changing masterSeed, namespace, or any single coordinate changes the output with overwhelming probability across 10_000 pairs.",
+          "Namespace isolation test: 1_000 pairs of calls with distinct namespaces but identical other arguments produce statistically independent values.",
+          "No Math.random, Date, performance, external entropy, or PRNG with state is used anywhere. Lint, compile, and boundary checks all pass. All prior tests remain green."
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002 — positional RNG, eleven named namespaces, hash function DEFINIR, no PRNG with state",
+          "§5.1 — all price layers are positional and O(1) for any tick",
+          "INV-02 — direct price query equals sequential advance",
+          "INV-03 — player actions do not alter worldPrice",
+          "INV-12 — no domain identifier depends on external entropy",
+          "§13 — Math.random, Date, performance, external entropy all prohibited in pure packages",
+          "§14.4 — packages/core scope"
+        ],
+        "title": "Write ADR-002 and implement positional RNG rand() in packages/core",
+        "why_now": "rand(masterSeed, namespace, ...coordinates) is the sole entropy source for every world value: all price layers, all macro events, all bot decisions, all NPC tip truth values. ADR-002 marks the hash function as DEFINIR with a specific start-point recommendation (SplitMix64 over FNV-1a) and requires bit-by-bit specification in an ADR before any implementation. Without rand(), packages/world cannot begin, INV-02 (direct tick query equals sequential advance) and INV-03 (player actions do not alter worldPrice) cannot be verified, and the price generator — an explicit FASE-1 deliverable — is unblocked only after this ADR is written and accepted. Nominal types are now in core so the only remaining prerequisite is the ADR itself."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed in docs/decisions/ documenting all three modes, the chosen enforcement mechanism (lint rule, TypeScript overload, or wrapper type), and why calling without a mode is a compile-time or lint error.",
+          "divTruncate(dividend: bigint, divisor: bigint): { quotient: bigint; remainder: bigint } implemented, and divHalfUp and divHalfEven with identical signatures.",
+          "Invariant: quotient * divisor + remainder === dividend for all inputs across all three modes.",
+          "Tests covering positive dividend, negative dividend, exact-midpoint values, and zero remainder for each mode.",
+          "No floating-point literals, no Math functions, no / operator on types derived from Money/Quantity/Price/Rate. Lint, compile, and boundary checks pass. All prior tests remain green."
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003 — / operator prohibited on economic types; intermediates use bigint",
+          "§3 ADR-004 — three explicit rounding modes; residue to world:rounding_residue; no mode is a compile or lint error; DEFINIR: enforcement mechanism",
+          "§6 — world:rounding_residue:<COMMODITY> exists once per commodity; money that evaporates in rounding is a bug",
+          "INV-07 — rounding residue fully accounts for the difference between truncated sums and nominal values",
+          "§7 — fee on notional requires explicit division mode",
+          "§13 — floating-point literals and number for economic values are prohibited in pure packages"
+        ],
+        "title": "Write ADR-004 and implement bigint division helpers with explicit rounding modes in packages/core",
+        "why_now": "ADR-003 prohibits the / operator on economic types. ADR-004 mandates that every division declares one of three modes (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) and that calling division without a declared mode is a compile-time or lint error. The enforcement mechanism is a DEFINIR item requiring its own ADR before implementation. Without division helpers, packages/domain cannot compute fees, rounding residue, or any monetary split, and INV-07 (rounding residue fully accounts for all precision loss) cannot be verified. This work is fully independent of IDEA-001 and can proceed in parallel on a separate branch."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction, Entry, Account, Commodity types defined in packages/domain using branded types from packages/core.",
+          "Each Entry explicitly declares its commodity; Entry without commodity is a TypeScript type error.",
+          "post(transaction) validates per-commodity zero-sum balance before applying and rejects unbalanced transactions with a typed error; no mutation is possible through the exported API after posting.",
+          "Minimum account set matches §6: world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, world:insurance_fund, player:cash:BRL, player:spot:<ASSET>, player:margin:<INSTRUMENT>, venue:fees, venue:funding, venue:realized_pnl, venue:liquidation_penalty.",
+          "Property test (INV-04): per-commodity sum is exactly zero for 1_000 generated valid transactions.",
+          "Property test (INV-05): BRL balance sum across all accounts remains zero after any sequence of 1_000 valid transactions.",
+          "packages/domain imports only packages/core. Lint, compile, and boundary checks pass. All prior tests remain green."
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 — multi-commodity double-entry ledger; balancing is per-commodity not aggregate; Transaction, Entry, Account, causationId required",
+          "INV-04 — per-commodity sum is exactly zero in every Transaction",
+          "INV-05 — BRL sum across all accounts is always zero",
+          "INV-06 — per-asset quantity sum across all accounts is always zero",
+          "INV-07 — rounding residue accounts for all precision loss, no value evaporates",
+          "§4 — Account, Entry, Transaction, Commodity in the domain glossary"
+        ],
+        "title": "Implement multi-commodity double-entry ledger in packages/domain",
+        "why_now": "The double-entry ledger is an explicit FASE-1 deliverable and is the sole state container through which every domain operation — spot buy, spot sell, fee booking, rounding residue posting, margin adjustment — must pass. Nominal types are now in core (TASK-0011). Once division helpers land (IDEA-002), there are no remaining DEFINIR items blocking the ledger. INV-04 (per-commodity zero-sum in every Transaction), INV-05 (BRL sum always zero), INV-06 (per-asset quantity sum always zero), and INV-07 (rounding residue accounted) are all ledger invariants required in the FASE-1 acceptance gate. Deferring the ledger defers the entire domain and application layers."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main creates BrowserWindow with contextIsolation:true, nodeIntegration:false, sandbox:true in all configurations; no webSecurity:false anywhere; Content Security Policy excludes unsafe-eval and all remote loading.",
+          "apps/desktop/preload exposes only an explicit named-channel allowlist via contextBridge; no generic invoke(channel, args) pattern.",
+          "apps/desktop/simulation-worker hosts the application entry point stub; typed IPC message contract defined in packages/contracts using structured clone; renderer imports only packages/ui and packages/contracts.",
+          "Minimum pt-BR UI renders: lightweight-charts placeholder, BRL balance display, buy and sell buttons, pause and 1x control, and the mandatory permanent simulation disclaimer from §20.",
+          "CI produces working installers for Windows and Linux via electron-builder.",
+          "INV-29 automated check passes in CI gate for all modes including development. Lint, compile, and boundary checks pass."
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.2 — contextIsolation:true, nodeIntegration:false, sandbox:true, CSP without unsafe-eval, no webSecurity:false; simulation in dedicated worker; typed IPC via structured clone; no generic invoke channel",
+          "§14.6 — installer for Windows and Linux in FASE-1; installer that opens an empty window in FASE-1 is worth more than a perfect installer in FASE-7",
+          "§15 FASE-1 — installer produced by CI; simulation running in worker with typed message contract; minimum pt-BR UI with chart placeholder, BRL balance display, buy/sell buttons, pause/1x control; mandatory permanent disclaimer",
+          "INV-29 — contextIsolation:true, nodeIntegration:false, sandbox:true in all modes including development; preload exposes only named-channel allowlist; verified in CI gate",
+          "§20 — mandatory permanent non-dismissable simulation disclaimer"
+        ],
+        "title": "Electron minimum security scaffolding and installer for Windows and Linux (INV-29, FASE-1)",
+        "why_now": "FASE-1 acceptance explicitly requires a minimum installer for Windows and Linux produced by CI — and the spec warns that discovering packaging, ABI, and cross-platform path problems at the end is unrecoverable. After 43 checkpoints, no Electron window has been produced and no installer has been built. This work is fully independent of all other FASE-1 tasks and can proceed on any branch without waiting for rand(), division helpers, or the ledger. Every additional cycle without an installer is a cycle in which ABI failures, electron-builder configuration errors, and native module rebuild issues remain hidden."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed documenting the fixed-point or lookup-table approach for log-space price construction with a cross-platform bit-identical guarantee and at least two test vectors.",
+          "Octave count, block periods, and amplitudes placed in a versioned configuration file; changing any parameter invalidates the spec compatibility hash.",
+          "price(assetId: AssetId, tick: Tick): Price implemented in packages/world for at least ORB and NEXA using only positional RNG and integer arithmetic; no floating-point literals; no transcendental Math calls.",
+          "INV-02 property test: price(asset, t) computed directly equals price reached by advancing tick-by-tick for 100 randomly chosen (asset, t) pairs including t values above 500_000.",
+          "INV-03 property test: two invocations with the same masterSeed but different action logs produce identical worldPrice series.",
+          "packages/world imports only packages/core; boundary check passes. Lint, compile, and all prior tests remain green."
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "high",
+        "spec_refs": [
+          "§5.1 — logPrice construction in log-space with trendLayer, marketFactor, idiosyncraticNoise, regimeAmplitude; all layers positional and O(1) for any tick",
+          "§3 ADR-005 — tick-level price is a point value, no OHLC",
+          "§3 ADR-003 — Math.sin, Math.exp, Math.log, Math.pow all prohibited in pure packages; fixed-point or lookup-table required with cross-platform bit-identical result; octave parameters in versioned config file",
+          "INV-02 — price(asset, t) direct equals sequential advance for any t and any asset",
+          "INV-03 — player actions do not alter worldPrice",
+          "INV-26 — world does not import domain or application"
+        ],
+        "title": "Implement world price generator (two assets, two noise layers) in packages/world",
+        "why_now": "FASE-1 acceptance explicitly requires a price generator with at least two noise layers and two assets. It is the primary consumer of rand() and is the prerequisite for INV-02 (direct tick query equals sequential advance) and INV-03 (player actions do not alter worldPrice), both required in the CI gate. Two DEFINIR items must be resolved as part of this task: octave parameters must be placed in a versioned configuration file, and the fixed-point or lookup-table strategy for log-space price construction must be documented in an ADR since Math.sin, Math.exp, Math.log, and Math.pow are all prohibited in pure packages. This task has the highest risk of the five because the DEFINIR choices directly affect cross-platform determinism."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo infrastructure is operational: TypeScript strict mode, ESLint determinism lint, package boundary checker, and CI test gate are all in place. packages/core exports CanonicalEncoder (ADR-009 written and accepted) and the five nominal branded types with scale constants (TASK-0011, most recent commit). All other packages — world, domain, application, narrative, contracts, adapters, ui — are empty stubs. tools/replay, tools/bench, tools/package are stubs. No Electron window exists; no installer has been produced. Only ADR-009 is on record; ADR-002 (hash function for positional RNG) and ADR-004 (division rounding enforcement) remain DEFINIR-open and unresolved.",
+      "highest_priority_gap": "packages/core still lacks the positional RNG rand() and bigint division helpers — the two remaining foundational primitives in core. Without rand(), packages/world cannot begin and INV-02 and INV-03 cannot be verified. Without division helpers, packages/domain cannot perform any monetary arithmetic and INV-04 through INV-07 cannot be verified. Both are gated by DEFINIR items requiring their own ADRs before implementation."
+    },
+    "warnings": [
+      "Two DEFINIR decisions must each be resolved by a separate ADR before their respective implementations begin: (a) the hash function for positional RNG (ADR-002), which blocks packages/world; (b) the technical enforcement mechanism for rounding modes (ADR-004), which blocks packages/domain. These are independent ADRs and should be authored concurrently to avoid sequential delay on the critical path.",
+      "The world price generator (IDEA-005) requires a DEFINIR decision on the fixed-point or lookup-table strategy for log-space computation before any implementation can begin. Math.sin, Math.exp, Math.log, and Math.pow are all prohibited in pure packages by §13. The ADR must document the chosen strategy and prove cross-platform bit identity before any price code is written. This is a non-trivial numerical engineering problem and the highest-risk item in FASE-1.",
+      "FASE-1 acceptance explicitly states that a minimum installer for Windows and Linux must exist in FASE-1 'in minimum form, not at the end.' After 43 checkpoints, no installer has been produced. Every additional cycle without Electron packaging work risks discovering ABI, native module, and cross-platform path failures with no remaining time to correct architectural decisions."
+    ]
+  }
+}

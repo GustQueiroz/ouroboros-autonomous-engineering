@@ -1,0 +1,91 @@
+{
+  "attempt": 1,
+  "created_at": "2026-08-14T13:44:39.968789+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "packages/core/src/index.mts exports branded TypeScript types Money, Quantity, Price, Rate, and Tick.",
+        "evidence": "index.mts re-exports Money, Quantity, Price, Rate, Tick as types from nominal-types.mjs; each type is a branded bigint/number intersected with a distinct readonly '__ciclo_brand' literal tag ('Money' | 'Quantity' | 'Price' | 'Rate' | 'Tick').",
+        "status": "PASS"
+      },
+      {
+        "criterion": "packages/core/src/index.mts exports QUANTITY_SCALE as 100_000_000n, PRICE_SCALE as 10_000n, and RATE_SCALE as 100_000_000n, with bigint literal types preserved.",
+        "evidence": "packages/core/src/nominal-types.mts declares them as top-level `const` bigint literals; dist/nominal-types.d.mts emits `export declare const QUANTITY_SCALE = 100000000n;`, `PRICE_SCALE = 10000n;`, `RATE_SCALE = 100000000n;`, preserving bigint literal types. Runtime tests assert typeof === 'bigint' and value equality.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "At runtime, each Money, Quantity, Price, and Rate constructor or guard rejects non-bigint inputs and accepts bigint inputs without precision conversion.",
+        "evidence": "asMoney/asQuantity/asPrice/asRate call assertBigint which throws NominalTypeError with a per-type code (e.g. NOMINAL_MONEY_NOT_BIGINT) when typeof value !== 'bigint'; the returned value is the exact input bigint (returned as-is via a type cast, no numeric conversion). Runtime tests cover number, decimal number, string, null, undefined, boolean, object, symbol rejection and bigint acceptance for 0n, -1n, and a 30-digit bigint.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "At runtime, the Tick constructor or guard accepts 0 and Number.MAX_SAFE_INTEGER and rejects negative values, values above Number.MAX_SAFE_INTEGER, non-integers, NaN, infinities, and non-number inputs.",
+        "evidence": "asTick validates typeof === 'number', then NaN, +Infinity, -Infinity, Number.isInteger, and range [0, Number.MAX_SAFE_INTEGER], each with its own error code. Runtime tests cover all listed boundaries: 0, MAX_SAFE_INTEGER, -1, MAX_SAFE_INTEGER+1, 1.5, NaN, +/-Infinity, bigint, string, null, undefined, boolean, object, symbol.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Compile-time fixtures demonstrate that raw primitive values and values of a different brand cannot be assigned to any branded type without passing through its corresponding public constructor or guard.",
+        "evidence": "packages/core/src/__nominal_types_typecheck__.mts uses @ts-expect-error on every negative case (bigint literal→Money/Quantity/Price/Rate; number 0→Tick; asMoney(1n)→Quantity; asQuantity(1n)→Price; asPrice(1n)→Rate; asRate(1n)→Money; asMoney(1n)→Tick; asTick(0)→Money/Quantity/Price/Rate). Positive cases (each constructor's result to its own brand) are declared without @ts-expect-error and compile cleanly. TypeScript's TS2578 'Unused @ts-expect-error directive' guarantees the negatives are enforced: verified by probe that removing a real error surfaces TS2578. `npm run compile` succeeds.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No packages/core import is introduced, and the repository boundary checker remains green.",
+        "evidence": "nominal-types.mts and __nominal_types_typecheck__.mts import only from './nominal-types.mjs' (same package); no cross-package imports. `npm run boundary` reports 'dependency-boundary: OK. 15 workspace packages validated against §14.5.'",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The full existing test suite, strict TypeScript build or typecheck, lint suite, and determinism-lint fixture suite remain green.",
+        "evidence": "`npm run compile` (tsc -b) succeeds; `npm run lint` (eslint --max-warnings=0 .) succeeds with no output; `npm test` reports 166 passing / 0 failing (up from 101 baseline); `npm run boundary` reports OK.",
+        "status": "PASS"
+      }
+    ],
+    "adrs_created_or_updated": [],
+    "changed_files": [
+      "packages/core/src/index.mts",
+      "packages/core/src/nominal-types.mts",
+      "packages/core/src/__nominal_types_typecheck__.mts",
+      "tests/core/nominal-types.test.mjs"
+    ],
+    "discovered_out_of_scope_issues": [],
+    "invariants_affected": [
+      "INV-23 (Tick bounded to safe non-negative integer range enforced by asTick)",
+      "INV-26 (packages/core imports nothing — preserved; no new imports added)"
+    ],
+    "known_issues": [],
+    "notes_for_reviewer": [
+      "Brand technique: intersection of the primitive (bigint or number) with `{ readonly __ciclo_brand: <literal> }`. Distinct literal string per type prevents cross-brand assignment; the property does not exist on primitives, so primitive→brand assignment is rejected. No runtime cost.",
+      "Compile-time fixture file lives inside the core src tree so `tsc -b` type-checks it automatically. It exports its symbols to avoid any potential `noUnusedLocals` concerns and to make it a real emitted module. TS2578 (unused `@ts-expect-error`) guarantees the negative cases stay enforced if the brand ever loosens.",
+      "asTick(value: number) uses `const candidate: unknown = value` before the `typeof` check to accept the reality that JavaScript may pass non-number values at runtime, and to keep the runtime rejection code path meaningful without a redundant-cast lint warning.",
+      "Error codes are prefixed `NOMINAL_` to mirror the existing `CANONICAL_` convention in canonical-encoder.mts and to keep them globally unambiguous. Each rejection reason has its own code so downstream consumers (and later ADR-004 helpers) can pattern-match precisely.",
+      "No changes to CanonicalEncoder or any other pre-existing exports; index.mts adds new re-exports only.",
+      "Package `@ciclo/core` still has no imports outside its own directory; boundary graph unchanged."
+    ],
+    "status": "COMPLETED",
+    "summary": "Added branded nominal types Money, Quantity, Price, Rate, Tick and their runtime-validated constructors (asMoney, asQuantity, asPrice, asRate, asTick), plus scale constants QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n, exported from packages/core/src/index.mts. Money/Quantity/Price/Rate constructors reject every non-bigint runtime input via NominalTypeError with granular codes. Tick constructor accepts only integer numbers in [0, Number.MAX_SAFE_INTEGER] and rejects negatives, over-range, non-integer, NaN, +/-Infinity, bigint, string, null, undefined, boolean, object, symbol. Added a compile-time typecheck fixture (packages/core/src/__nominal_types_typecheck__.mts) using @ts-expect-error to prove that raw primitives and cross-brand values cannot be assigned to any brand without going through its constructor, and that constructor results ARE assignable to their target brand. Runtime tests (tests/core/nominal-types.test.mjs) cover exact-value and bigint-typeof checks for all scale constants and every acceptance-listed boundary of every constructor. No package boundary edges added.",
+    "task_id": "TASK-0011",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json succeeds with strict/noUncheckedIndexedAccess for all 15 workspace projects, including the new nominal-types.mts and its compile-time typecheck fixture."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . passes; no pure-package restricted-globals/syntax/imports violations from the new sources."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary check reports OK against §14.5 for all 15 workspace packages; INV-26 preserved."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "node --test across tests/config, tests/lint, tests/boundary, tests/core reports 1..166, pass 166, fail 0, including the full determinism-lint fixture suite (rules.test.mjs) and the new tests/core/nominal-types.test.mjs (65 new subtests)."
+      }
+    ]
+  },
+  "task_id": "TASK-0011"
+}
