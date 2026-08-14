@@ -1,0 +1,151 @@
+{
+  "created_at": "2026-08-14T13:13:22.547465+00:00",
+  "cycle_id": "CYCLE-000121",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Branded types Money, Quantity, Price, Rate exported from packages/core as bigint newtypes; constructor rejects non-integer bigint values and wrong brand",
+          "Branded type Tick exported as number newtype; constructor rejects non-integers and values outside [-(2^53-1), 2^53-1]",
+          "Scale constants QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n exported as const bigint",
+          "TypeScript strict mode rejects cross-brand assignment without explicit constructor",
+          "Property test: Tick constructor rejects values above 2^53-1 (INV-23 guard)",
+          "npm run compile, lint, and boundary check continue to exit 0"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003 §3",
+          "§4 glossário travado",
+          "§14.1 TypeScript nominal types mandatory",
+          "INV-23",
+          "FASE-1 acceptance: core completo, aritmética inteira"
+        ],
+        "title": "Implement nominal types and scale constants in packages/core",
+        "why_now": "CanonicalEncoder is the only substantive code in packages/core. ADR-003 is TRAVADO and fully specifies Money, Quantity, Price, Rate as branded bigint types and Tick as a branded safe-integer number with validation. No DEFINIR decision blocks these definitions — scale constants (QUANTITY_SCALE, PRICE_SCALE, RATE_SCALE), constructor-validators, and overflow guards are all precisely specified. Every downstream FASE-1 package (domain, world, application, contracts) is blocked at the type level until these exist. This is the shallowest FASE-1 dependency with the widest fan-out and zero open decisions required."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed in docs/decisions/ specifying algorithm bit-by-bit with constants, bit widths, mixing steps, and TypeScript representation",
+          "rand(masterSeed, namespace, ...coordinates) exported from packages/core with no mutable state",
+          "Determinism test: identical arguments always return identical value across repeated calls",
+          "Namespace isolation test: same coordinates in distinct namespaces produce different values over a large sample",
+          "No Math.random, Date, performance, crypto, or platform entropy used",
+          "All existing tests pass; lint and boundary check remain green"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002 TRAVADO",
+          "INV-02",
+          "INV-03",
+          "INV-12",
+          "§5.1 all price layers are positional",
+          "§19 lacunas conhecidas — hash function is DEFINIR"
+        ],
+        "title": "Write ADR-002 and implement deterministic positional RNG in packages/core",
+        "why_now": "ADR-002 is TRAVADO and requires the hash function to be specified bit-by-bit in an ADR before any rand() implementation. The spec recommends SplitMix64 over FNV-1a and lists the hash function as an open DEFINIR in §19. INV-02 — described explicitly as the most important test of the project — requires that price(asset, t) consulted directly equals the result of advancing tick by tick, which is only possible with a stateless positional RNG. All six world namespaces (market.trend, market.factor, market.regime, macro.schedule, bot.policy, bot.decision) are blocked until rand() exists."
+      },
+      {
+        "acceptance_targets": [
+          "ADR filed documenting three modes and the enforcement mechanism",
+          "divTruncate(dividend, divisor) returning {quotient, remainder} exported from packages/core",
+          "divHalfUp and divHalfEven with identical signatures exported",
+          "Invariant test: quotient * divisor + remainder === dividend for all three modes at positive, negative, and exact-midpoint boundaries",
+          "Enforcement demonstrated: bare / on a branded type is rejected at compile time or blocked by lint",
+          "No floating-point literals or Math functions in implementation"
+        ],
+        "category": "architecture",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-004 TRAVADO",
+          "ADR-003 §3 — bare / prohibited on Money, Quantity, Price, Rate",
+          "§6 world:rounding_residue:<COMMODITY>",
+          "INV-07",
+          "§7 notional = (Quantity * Price) / (QUANTITY_SCALE * PRICE_SCALE) in bigint",
+          "§19 lacunas conhecidas — enforcement mechanism is DEFINIR"
+        ],
+        "title": "Write ADR-004 and implement bigint division helpers in packages/core",
+        "why_now": "ADR-004 is TRAVADO: every operation that loses precision must declare its rounding mode explicitly, and calling division without a mode must be a compile-time or lint-blocking error. The enforcement mechanism is the open DEFINIR. Without the three helpers (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) and their lint guard, the domain ledger cannot implement spot execution, fee calculation, notional computation, or rounding residue posting (INV-07). Implementing the ledger before this is in place allows implicit division to proliferate in domain code unchecked."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main bootstraps an Electron BrowserWindow with contextIsolation:true, nodeIntegration:false, sandbox:true in all configurations",
+          "apps/desktop/preload exposes only named channels via contextBridge; no generic invoke(channel, args) surface",
+          "apps/desktop/simulation-worker is wired as a Worker thread; typed message contract in packages/contracts",
+          "CI produces a Windows installer and a Linux installer from electron-builder on every build",
+          "INV-29 audit script verifies window configuration at CI time",
+          "Window opens and closes without error on both platforms"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.2 topologia de processos TRAVADO",
+          "§14.6 empacotamento TRAVADO",
+          "INV-29",
+          "§14.6: instalador existe na FASE-1",
+          "FASE-1 acceptance: simulação em worker, instalador Windows e Linux produzido pelo CI"
+        ],
+        "title": "Electron application bootstrap and FASE-1 minimum installer",
+        "why_now": "The spec states TRAVADO: 'instalador mínimo existe na FASE-1, em forma mínima. Não no fim.' and explicitly warns that deferring packaging risks discovering ABI failures in the final week with no time to fix architecture. 41 checkpoints have passed with no installer work started. All four desktop apps are export{} stubs. INV-29 (contextIsolation:true, nodeIntegration:false, sandbox:true) cannot be tested until an Electron BrowserWindow exists. This work is fully independent of all domain packages and can proceed in parallel with IDEA-001 through IDEA-003."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction, Entry, Account types defined in packages/domain using branded types from packages/core",
+          "Each Entry has an explicit commodity field; an Entry without commodity is a TypeScript type error",
+          "post(transaction) validates per-commodity zero-sum balance before applying; rejects unbalanced transactions with a typed error",
+          "Spot market buy and spot market sell operations post the four required entries in a single balanced Transaction",
+          "Property test: 1000 randomly constructed valid Transactions satisfy INV-04",
+          "Property test: BRL balance sum across all accounts remains zero after any sequence of valid spot Transactions (INV-05)",
+          "Ledger entries are immutable after posting; no mutation path through exported API",
+          "packages/domain imports only packages/core; boundary check passes (INV-26)"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-003"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 dupla entrada, balanceamento por commodity",
+          "§6 minimum account set",
+          "§6 Transaction carries tick, sequence, kind, causationId",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "FASE-1 acceptance: Ledger multi-commodity de dupla entrada, Ordem a mercado"
+        ],
+        "title": "Implement domain double-entry ledger in packages/domain",
+        "why_now": "FASE-1 acceptance explicitly requires 'Ledger multi-commodity de dupla entrada' and 'Ordem a mercado, compra e venda spot'. INV-04, INV-05, and INV-06 are FASE-1 acceptance gate invariants that cannot be satisfied without this. The ledger is a prerequisite for every domain operation — spot buy, sell, fee posting, rounding residue — and must exist before the tick loop and StateHash can be implemented. Once IDEA-001 (nominal types) and IDEA-003 (division helpers) are merged, no DEFINIR blocks ledger implementation since the account structure, transaction format, causationId requirement, and per-commodity zero-sum rule are all fully specified."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Infrastructure and tooling are complete: monorepo skeleton, TypeScript strict mode, determinism lint (all §13 rules active and tested), dependency boundary checker (§14.5 graph enforced), workspace configuration, and CanonicalEncoder with ADR-009 accepted and tested (over 100 tests). One ADR is on file. Every other package — world, domain, application, narrative, contracts, adapters, ui, and all apps/desktop sub-packages — is an empty stub exporting nothing. No nominal types, no positional RNG, no division helpers, no ledger, no price generator, no tick loop, no save system, no CLI replay tool, no benchmark tool, no minimal UI, and no installer exist. Checkpoints 0034 through 0041 all report NO_ACCEPTED_CHANGES.",
+      "highest_priority_gap": "packages/core is missing the foundational nominal integer types (Money, Quantity, Price, Rate, Tick) specified by ADR-003 TRAVADO. These have no open DEFINIR decisions, no ambiguity, and no dependencies. Until they exist, packages/domain, packages/world, and packages/application cannot be implemented at the type level. This is the shallowest dependency node with the widest FASE-1 fan-out."
+    },
+    "warnings": [
+      "41 consecutive checkpoints (0001–0041) report NO_ACCEPTED_CHANGES after the canonical encoder was implemented. The same five proposals have been generated in every cycle from CYCLE-000070 onward. The block is not in the analysis — the repository state is genuinely unchanged. If proposals continue to be generated without acceptance, the bottleneck is in the Builder or Reviewer role.",
+      "Three open DEFINIR decisions block distinct FASE-1 work streams simultaneously: (a) hash function algorithm for ADR-002, which blocks rand() and every world namespace consumer; (b) technical enforcement mechanism for division rounding mode (ADR-004), which blocks ledger fee and notional calculation; (c) fixed-point or lookup-table strategy for log-space price construction plus octave parameters (§5.1), which blocks the price generator. These should be resolved in parallel rather than sequentially to avoid compressing the FASE-1 critical path.",
+      "FASE-1 acceptance requires a minimum installer for Windows and Linux (§14.6 TRAVADO). The spec warns explicitly that deferring this risks discovering ABI failures, native module rebuild issues, and path errors in the final week with no time to correct architecture. No Electron code, no electron-builder configuration, and no INV-29 compliance audit exist after 41 checkpoints. This risk grows every cycle this is postponed."
+    ]
+  }
+}

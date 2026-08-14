@@ -1,0 +1,152 @@
+{
+  "created_at": "2026-08-14T13:02:48.887189+00:00",
+  "cycle_id": "CYCLE-000118",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Branded nominal types Money, Quantity, Price, Rate, Tick exported from @ciclo/core; constructors reject non-integers and values outside [-(2^53-1), 2^53-1]",
+          "divWithMode(a, b, mode) helper requires explicit TRUNCATE_TOWARD_ZERO | ROUND_HALF_UP | ROUND_HALF_EVEN; bare / operator over branded types blocked by lint or type error",
+          "ADR written for ADR-004 DEFINIR: how rounding enforcement is imposed technically",
+          "Property test: no intermediate or final value exceeds 2^53 across a skeleton replay using all arithmetic helpers (INV-23)",
+          "All lint-forbidden patterns (float literals, Math.sin/cos/exp/log) still blocked in pure packages"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "INV-23",
+          "§14.1",
+          "§12 INV-07",
+          "FASE-1 acceptance criteria"
+        ],
+        "title": "Core branded integer types and arithmetic with division rounding modes",
+        "why_now": "Every other FASE-1 package depends on @ciclo/core for Money, Quantity, Price, Rate, and Tick nominal types and the divWithMode helper. Currently core exports only CanonicalEncoder. Nothing in world, domain, or application can advance until these types exist and ADR-004's DEFINIR (enforcement of division mode) is resolved by ADR and by lint or type system."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written specifying hash function bit-by-bit (SplitMix64 over FNV-1a per spec recommendation, or justified alternative)",
+          "rand(masterSeed, namespace, ...coordinates) exported from @ciclo/core; result is safe integer in [0, 2^53-1]",
+          "All 11 namespaces from spec table registered as typed constants",
+          "Property test: same arguments always return same value; different coordinates produce distinct values over large sample",
+          "No Math.random, no Date, no mutable PRNG state — enforced by existing lint",
+          "INV-12 satisfied: every identifier derivable from (seed, tick, sequence) without external entropy"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-03",
+          "INV-12",
+          "§5.1",
+          "§19 lacunas conhecidas"
+        ],
+        "title": "Positional RNG and hash-function ADR",
+        "why_now": "ADR-002 marks the hash function as DEFINIR with a strong recommendation of SplitMix64 over FNV-1a. The spec calls INV-02 — price(asset, t) computed directly equals advancing tick by tick — 'the most important test of the project', and that invariant requires a positional RNG. Without rand(), the price generator, macro events, bot policies, and NPC tips cannot start. ADR-002 requires the hash to be specified bit-by-bit in an ADR before any rand() implementation exists."
+      },
+      {
+        "acceptance_targets": [
+          "Entry declares commodity at the type level; Entry without commodity is a compile error",
+          "createTransaction and postTransaction enforce per-commodity sum-zero; violation throws deterministically",
+          "All accounts from spec minimum list exist as typed constants (world:issuance, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, world:insurance_fund, player:cash:BRL, player:spot:<ASSET>, venue:fees, venue:funding, venue:realized_pnl, venue:liquidation_penalty)",
+          "Property test: 1000 random transaction sequences preserve INV-05 (BRL sum = 0) and INV-06 (per-asset quantity sum = 0)",
+          "Rounding residue from any division posted to world:rounding_residue:<COMMODITY> (INV-07)",
+          "causationId required and typed on every Transaction; no orphaned transaction possible"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "§6",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "ADR-003",
+          "ADR-004",
+          "§4 glossary"
+        ],
+        "title": "Multi-commodity double-entry ledger",
+        "why_now": "The ledger is the source of truth for all economic state (INV-04 through INV-07). It must exist before market orders, the tick loop, or save/replay work. Its interface is fully specified: Transaction, Entry, Account, per-commodity balance-zero invariant, causationId on every transaction. The domain package is an empty stub; this is its first substantive deliverable. It depends only on IDEA-001 and can proceed in parallel with IDEA-002."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main bootstraps an Electron BrowserWindow with contextIsolation:true, nodeIntegration:false, sandbox:true in all configurations including development",
+          "apps/desktop/preload exposes only named channels via contextBridge — no generic invoke(channel, args) surface",
+          "apps/desktop/simulation-worker wired as a Worker thread; typed message contract defined in packages/contracts",
+          "CI produces a Windows installer and a Linux installer via electron-builder on every build",
+          "INV-29 audit script verifies window configuration at CI time",
+          "Window opens and closes without error on both platforms; application content may be minimal"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.2",
+          "§14.6",
+          "INV-29",
+          "FASE-1 acceptance criteria",
+          "§14.1"
+        ],
+        "title": "Electron application bootstrap and FASE-1 minimum installer",
+        "why_now": "The spec states explicitly: 'o instalador existe na FASE-1, em forma mínima. Não no fim. Se o empacotamento multiplataforma aparecer depois, o time descobre problema de módulo nativo, de ABI e de caminho de arquivo na última semana.' All four Electron desktop app entry points are empty stubs. INV-29 (contextIsolation, nodeIntegration=false, sandbox=true) cannot be CI-tested until a real Electron bootstrap exists. This is a parallel-track item that does not depend on domain logic."
+      },
+      {
+        "acceptance_targets": [
+          "ADR written for octave count, periods, and amplitudes (DEFINIR); values in versioned config file",
+          "ADR written for fixed-point approach to trendLayer and idiosyncraticNoise (no Math.sin/cos/exp/log)",
+          "price(assetId, tick) exported from @ciclo/world for ORB (blue chip) and NEXA (layer-1)",
+          "Test: price(ORB, 9_000_000) computed directly equals value reached advancing tick by tick (INV-02)",
+          "Test: two sessions with same seed but different player action logs produce identical worldPrice series (INV-03)",
+          "No Math.random, no Date, no float literals — enforced by existing lint"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1",
+          "INV-02",
+          "INV-03",
+          "ADR-002",
+          "ADR-003",
+          "FASE-1 acceptance",
+          "§19 lacunas conhecidas"
+        ],
+        "title": "Price generator with two assets and two noise layers",
+        "why_now": "INV-02 — consultable positionally: price(asset, t) must equal arriving at t tick by tick for any t — is the spec's self-described most important test. The fractal octave construction (trendLayer + idiosyncraticNoise) is the first substantive use of the positional RNG and the first use of fixed-point arithmetic in world. Two noise layers and two assets are the FASE-1 minimum. This requires IDEA-001 and IDEA-002. The approach for fixed-point equivalents of transcendental functions must be decided by ADR before implementation."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo infrastructure is complete: CI pipeline, ESLint purity rules, dependency boundary checker, and all package stubs are in place. packages/core exports CanonicalEncoder with ADR-009 accepted (101 tests passing). One ADR is on file (0009-canonical-encoding.md). Every other package — world, domain, application, narrative, contracts, adapters, ui, and all apps/desktop sub-packages — is an empty stub exporting nothing. No nominal types, no positional RNG, no ledger, no price generator, no tick loop, no save system, no CLI replay tool, no benchmark tool, no minimal UI, and no installer exist.",
+      "highest_priority_gap": "packages/core lacks the foundational nominal integer types (Money, Quantity, Price, Rate, Tick per ADR-003) and the division helper with explicit rounding modes (ADR-004 DEFINIR must be resolved by ADR) that every downstream FASE-1 package depends on. Until these exist, no work in world, domain, or application can proceed at the type level."
+    },
+    "warnings": [
+      "ADR-004 requires calling division without an explicit rounding mode to be 'an error de compilação ou erro de lint bloqueante' — the enforcement mechanism is DEFINIR and must be written to an ADR before core arithmetic ships. A lint rule targeting the bare / operator on branded types is one approach; a typed helper requiring the mode parameter is another. The choice extends the existing lint rule set.",
+      "ADR-002 requires the hash function to be specified bit-by-bit in an ADR before any rand() implementation exists. The spec recommends SplitMix64 over FNV-1a but this remains a DEFINIR. Once any StateHash is computed the hash function is frozen; changing it retroactively invalidates all reference hashes.",
+      "The price generator (§5.1) requires fixed-point implementations of functions equivalent to transcendental math (linear interpolation over fractal octaves) that must produce bit-identical results on Windows and Linux under the same Electron/V8 version (INV-19). The approach must be decided by ADR before implementation begins, since the choice affects every price value ever produced."
+    ]
+  }
+}

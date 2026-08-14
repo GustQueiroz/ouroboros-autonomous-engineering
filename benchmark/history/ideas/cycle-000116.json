@@ -1,0 +1,159 @@
+{
+  "created_at": "2026-08-14T12:56:40.361892+00:00",
+  "cycle_id": "CYCLE-000116",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "ADR-004 written and committed in docs/decisions/ before any arithmetic code",
+          "Branded constructors reject non-integer, NaN, and values outside safe integer range",
+          "add/sub/mul/div helpers with explicit rounding mode parameter; calling div without a mode is a lint error",
+          "No floating-point at any point in arithmetic paths (INV-04)",
+          "All scales exported as constants: QUANTITY_SCALE=100_000_000, PRICE_SCALE=10_000, RATE_SCALE=100_000_000",
+          "Unit tests cover overflow guards, rounding residue correctness, and all four rounding modes"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§4.3 (Money, Quantity, Price, Rate, Tick definitions and scales)",
+          "§4.4 (bigint for monetary types, number for Tick and generator internals)",
+          "ADR-004 (DEFINIR: division rounding enforcement)",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-23",
+          "§13 (/ and ** prohibited on nominal types)"
+        ],
+        "title": "Implement core nominal types and fixed-point arithmetic (ADR-004)",
+        "why_now": "All FASE-1 deliverables (ledger, price generator, orders, tick loop) require branded types and deterministic integer arithmetic. ADR-004 is marked DEFINIR and must be authored before any division code is written. Without these primitives, no other package can be correctly implemented."
+      },
+      {
+        "acceptance_targets": [
+          "ADR-002 written with full bit-level specification of the chosen hash function",
+          "rand(masterSeed, namespace, ...coordinates) -> bigint (uint64 range) implemented in packages/core",
+          "Output is bit-identical to a reference test vector included in the ADR",
+          "No native language hash function or Math.random used anywhere in the implementation",
+          "Tests verify: same inputs always produce same output; changing any coordinate changes output; namespace separation is effective"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002 (DEFINIR: hash function — SplitMix64 over FNV-1a accumulator recommended)",
+          "§5.1 (price noise layers sample rand() at block vertices)",
+          "§5.4 (bot policies derived from rand())",
+          "§5.5 (NPC tip truthfulness via rand())",
+          "INV-02",
+          "INV-03",
+          "INV-12"
+        ],
+        "title": "Implement positional RNG rand() and write ADR-002",
+        "why_now": "The price generator, bot policies, macro event scheduling, and NPC tip truthfulness all call rand(seed, namespace, ...coords). ADR-002 is DEFINIR and must specify the hash function bit-for-bit before any code that uses randomness. Without this, price generation and all world simulation are blocked."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction type enforces per-commodity zero-sum at construction; throws on violation",
+          "Accounts: player:cash, venue:inventory:<ASSET>, venue:fees, world:rounding_residue:<COMMODITY> all present",
+          "getBalance(accountId, commodity) returns exact bigint with no floating-point",
+          "Property test: 1000 random valid transaction sequences preserve INV-05 and INV-06",
+          "INV-07 tested: rounding residue account balance equals exact difference between nominal and sum of truncated entries"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 (double-entry multi-commodity ledger)",
+          "INV-04 (per-commodity entry sum is zero in every Transaction)",
+          "INV-05 (sum of all BRL account balances is zero)",
+          "INV-06 (sum of all quantities per asset is zero)",
+          "INV-07 (rounding residue account absorbs truncation; no value lost)",
+          "INV-13 (explicit total order on all collection iteration)",
+          "§7 step 8 (ledger entries posted after order execution)"
+        ],
+        "title": "Implement double-entry multi-commodity ledger in packages/domain",
+        "why_now": "The ledger is the core business entity for FASE-1. INV-04 through INV-07 are directly enforced by it, and market orders, tick loop, and save/load all depend on a working ledger. It is the next logical unit after core arithmetic is in place."
+      },
+      {
+        "acceptance_targets": [
+          "worldPrice(assetId, tick) implemented for at least ORB and NEXA using two noise layers (trendLayer + idiosyncraticNoise)",
+          "Octave count, periods, and amplitudes stored in a versioned config file; changing any parameter must change the spec compatibility hash",
+          "All randomness sourced exclusively through rand() — no Math.random, no Date, no external entropy",
+          "INV-02 verified by test: worldPrice(asset, t) equals final price after stepping tick-by-tick from 0 to t",
+          "INV-03 verified by test: two simulations with same seed but different action logs produce identical worldPrice series",
+          "Computation stays within safe integer bounds for a 10-year replay (INV-23)"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1 (logPrice = baseLevel + trendLayer + idiosyncraticNoise; fractal octaves, O(1) at any tick)",
+          "§5.2 (macro events overlay)",
+          "INV-02 (price(asset,t) direct equals tick-by-tick advance)",
+          "INV-03 (player actions do not alter worldPrice)",
+          "§4.3 (Price scale)",
+          "§13 (no transcendental Math functions, no float literals in pure packages)"
+        ],
+        "title": "Implement world price generator in packages/world (2 assets, 2 noise layers)",
+        "why_now": "The price generator is the core of the deterministic world engine. It unblocks effective price calculation, order execution, market impact, and bot simulation. The two DEFINIR parameters (octave count, periods, amplitudes) must be resolved and recorded in a versioned config file as part of this task."
+      },
+      {
+        "acceptance_targets": [
+          "All 10 canonical steps execute in the exact order specified in §7 with no skips or reordering",
+          "Market buy and sell spot orders processed: fill at effectivePrice, fees to venue:fees, residue to rounding_residue",
+          "StateHash computed after step 10 using CanonicalEncoder over the full state snapshot",
+          "Replay from (masterSeed, actionLog, finalTick) produces byte-identical StateHash at every tick (INV-01)",
+          "Test: same seed + empty action log run twice produces identical StateHash sequence",
+          "No floating-point arithmetic anywhere in the tick execution path"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003",
+          "IDEA-004"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "high",
+        "spec_refs": [
+          "§7 (10-step canonical tick processing order — locked)",
+          "§8.1 (market order execution; taker fee on notional)",
+          "INV-01 (replay produces identical StateHash at every tick)",
+          "INV-06 (no bot order volume exceeds bot balance)",
+          "INV-12 (all IDs derived from seed+tick+sequence)",
+          "INV-13 (explicit iteration order)"
+        ],
+        "title": "Implement canonical 10-step tick loop and spot market order execution",
+        "why_now": "The canonical tick loop is the integration point of all FASE-1 components and is required before StateHash, save/replay, and the replay tool can be implemented. Market orders (buy/sell spot) are the only order type required in FASE-1. Together these form the minimal viable simulation core."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold, CI pipeline, ESLint §13 pure rules, dependency boundary checker (§14.5), and CanonicalEncoder (ADR-009) are fully implemented with tests. All other packages (world, domain, application, narrative, contracts, adapters, ui, desktop apps, tools/replay, tools/bench) are empty stubs exporting nothing.",
+      "highest_priority_gap": "Core domain primitives are entirely absent: branded nominal types (Money, Quantity, Price, Rate, Tick), fixed-point arithmetic with explicit rounding modes, and positional RNG. Every remaining FASE-1 deliverable — ledger, price generator, orders, tick loop — depends on these foundations."
+    },
+    "warnings": [
+      "ADR-002 and ADR-004 are both marked DEFINIR and must be authored and committed as ADR documents before their corresponding implementations are written (per §15 acceptance criterion: 'ADR registrado para qualquer item marcado DEFINIR que a feature resolveu'). Any task that implements arithmetic or RNG without first writing the ADR violates the Definition of Done.",
+      "IMPACT_WINDOW (§5.1) and BOT_DECISION_PERIOD (§5.4) are also marked DEFINIR. They are not on the critical path for the first four proposals but will block macro event and bot simulation implementation in the latter half of FASE-1. These should be resolved and documented before those tasks are started.",
+      "The spec requires a minimal Electron installer (window open, even if empty) in FASE-1 with INV-29 (contextIsolation, nodeIntegration=false, sandbox=true) enforced from the start. This is a TRAVADO sequencing constraint (§15, §17 step 8) that must not be deferred to later phases. None of the above proposals address it; it should be scheduled in parallel with or immediately after the tick loop."
+    ]
+  }
+}

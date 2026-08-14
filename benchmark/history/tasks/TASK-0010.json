@@ -1,0 +1,69 @@
+{
+  "created_at": "2026-08-14T13:14:11.243398+00:00",
+  "cycle_id": "CYCLE-000121",
+  "payload": {
+    "blockers": [],
+    "planning_decision": "ACCEPT",
+    "reasoning_summary": "FASE-1 is the earliest incomplete phase. The nominal fixed-point types and scale constants are an unimplemented, dependency-free foundation required by domain, world, and application work. The proposal is accepted with corrected runtime expectations: TypeScript brands are compile-time constructs, so cross-brand misuse must be rejected by type tests rather than runtime brand inspection.",
+    "risks": [
+      "TypeScript brands provide compile-time nominal separation only and cannot authenticate a brand after type erasure; runtime validation must therefore validate primitive representation and numeric bounds.",
+      "Constructor naming and export shape must remain minimal and consistent to avoid creating an accidental public API that later FASE-1 work must preserve."
+    ],
+    "selected_idea_id": "IDEA-001",
+    "task": {
+      "acceptance_criteria": [
+        "packages/core publicly exports distinct Money, Quantity, Price, Rate, and Tick types; assigning any one branded type to another fails the compile-time type test.",
+        "Money, Quantity, Price, and Rate have bigint as their underlying representation, while Tick has number as its underlying representation.",
+        "The Tick constructor accepts exactly safe integers in the inclusive range [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER] and rejects fractional numbers, NaN, infinities, and values outside that range.",
+        "Runtime constructors reject values whose primitive type does not match the represented type; no acceptance criterion requires detecting an already-erased incorrect TypeScript brand at runtime.",
+        "packages/core publicly exports QUANTITY_SCALE as 100000000n, PRICE_SCALE as 10000n, and RATE_SCALE as 100000000n without floating-point conversion.",
+        "No production implementation uses Math.random, Date, performance, crypto entropy, floating-point arithmetic, or mutable global state.",
+        "The repository compile, lint, test, and dependency-boundary commands all exit successfully."
+      ],
+      "cycle_id": "CYCLE-000121",
+      "must_preserve": [
+        "CanonicalEncoder behavior and its accepted test vectors remain unchanged.",
+        "All existing determinism lint rules remain green.",
+        "The existing dependency graph remains green; packages/core must not acquire imports from higher-layer packages.",
+        "All existing strict TypeScript compiler settings remain enabled."
+      ],
+      "objective": "Provide the locked nominal bigint types, safe Tick type, constructors, and fixed-point scale constants required by FASE-1 consumers.",
+      "out_of_scope": [
+        "Positional RNG or ADR-002.",
+        "Rounding helpers, division enforcement, or ADR-004.",
+        "Ledger, transaction, order, pricing, tick-loop, Electron, worker, CI installer, or packaging work.",
+        "Runtime detection of cross-brand values, because TypeScript brands are erased at runtime.",
+        "Changes to CICLO_SPEC.md or unrelated packages."
+      ],
+      "required_adrs": [],
+      "required_tests": [
+        "Unit tests for every exported constructor and scale constant.",
+        "Tick boundary tests covering Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, both adjacent out-of-range values, fractional values, NaN, and positive and negative infinity.",
+        "Compile-time negative tests using the repository's established TypeScript type-test mechanism for every relevant cross-brand assignment and unbranded primitive assignment.",
+        "Run the full existing test suite, TypeScript compilation, lint suite, and dependency-boundary check."
+      ],
+      "scope": [
+        "Define and export Money, Quantity, Price, and Rate as distinct branded bigint types from packages/core.",
+        "Define and export Tick as a distinct branded number type.",
+        "Add constructors that validate runtime input types and reject invalid Tick values, including non-integers and values outside the JavaScript safe-integer range.",
+        "Export QUANTITY_SCALE = 100000000n, PRICE_SCALE = 10000n, and RATE_SCALE = 100000000n as bigint constants.",
+        "Add compile-time type assertions proving that the nominal types are not mutually assignable.",
+        "Expose the new public API through the existing packages/core entry point."
+      ],
+      "spec_refs": [
+        "CICLO_SPEC.md §4 locked glossary",
+        "CICLO_SPEC.md §14.1 mandatory TypeScript nominal types",
+        "CICLO_SPEC.md INV-23",
+        "CICLO_SPEC.md FASE-1 acceptance: complete core and integer arithmetic",
+        "ADR-003 §3 locked numeric representations"
+      ],
+      "task_id": "TASK-0010",
+      "title": "Add core nominal numeric types and scales"
+    }
+  },
+  "phase": "FASE-1",
+  "status": "CREATED",
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0010",
+  "title": "Add core nominal numeric types and scales"
+}
