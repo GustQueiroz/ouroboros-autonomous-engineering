@@ -1,0 +1,115 @@
+{
+  "created_at": "2026-08-14T04:04:44.119024+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 completely and unambiguously specifies the canonical grammar, admitted values, collision handling, rejection semantics, and non-execution traversal model.",
+        "evidence": "ADR-009 admits every string but incorrectly states that encoded object-key ties cannot occur. TextEncoder maps both a lone surrogate such as \"\\uD800\" and the literal replacement character \"\\uFFFD\" to EF BF BD. The ADR defines neither rejection nor a deterministic tie-breaker for this object-key collision.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "All validation-, traversal-, and determinism-sensitive intrinsics are captured at module initialization.",
+        "evidence": "canonical.ts resolves mutable facilities during calls, including global Set in `new Set<string>()`, `Uint8Array`/`Uint8Array.of`, Uint8Array.prototype.set, Array.prototype.push/sort, and String.prototype charCodeAt/charAt. These are absent from ADR-009's claimed exhaustive captured-intrinsic list.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Every admitted container property or element is consumed without invoking accessors.",
+        "evidence": "Objects and arrays obtain element/property values through captured Reflect.getOwnPropertyDescriptor, and ownDataValue rejects accessor descriptors without reading their getter or setter. Set traversal uses the captured intrinsic forEach operation.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Proxy-wrapped containers are rejected without invoking user-defined traps.",
+        "evidence": "encodeValue calls the captured node:util types.isProxy predicate before array recognition or reflection; hostile proxy tests cover object, array, Set, nested, and revoked proxies with zero recorded trap calls.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Set subclasses and overridden traversal behavior are rejected or handled through a proven non-overridable intrinsic with zero user-code invocation.",
+        "evidence": "Set subclasses fail prototype identity and instance iterator/forEach overrides are bypassed through captured Set.prototype.forEach; hostile-set tests assert the sentinels remain zero.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Array accessors and Proxy-wrapped arrays reject deterministically without executing user code.",
+        "evidence": "hostile-array tests assert E_ACCESSOR_DESCRIPTOR with zero getter/setter calls and E_PROXY_REJECTED with zero proxy trap calls.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Post-import replacement of mutable globals cannot change bytes or rejection behavior.",
+        "evidence": "The tests patch only a subset of mutable dependencies. encodeObject executes `new Set<string>()` through the current global Set binding, while byte construction repeatedly resolves Uint8Array and Uint8Array.of. Replacing these after import can alter behavior or execute replacement code.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Logically equal admitted states encode to byte-identical output under INV-22.",
+        "evidence": "For two objects containing the same mappings for keys \"\\uD800\" and \"\\uFFFD\" but created in opposite insertion orders, both keys encode as the same `s3:EF-BF-BD;` bytes. The comparator returns zero, so stable sort preserves insertion order and the associated values are emitted in different orders.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "All accepted tests, strict typecheck, lint, dependency boundaries, and CI-equivalent validation remain green.",
+        "evidence": "Automated output proves lint and test success but contains no compile/typecheck or dependency-boundary gate. Its warnings explicitly say no typecheck/build script was found. The Implementer report's summaries are not accompanied by authoritative command output.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "No StateHash implementation is introduced.",
+        "evidence": "The candidate adds only the byte encoder, its public exports, ADR, and tests; no StateHash implementation appears in the supplied diff.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "TextEncoder replaces lone surrogates with U+FFFD. Therefore object keys \"\\uD800\" and \"\\uFFFD\" have identical encoded key bytes. Since encodeObject sorts only by those bytes, equal logical objects constructed with opposite insertion order emit their different associated values in opposite order. ADR-009's assertion that ties cannot occur is false.",
+        "id": "REVIEW-001",
+        "required_change": "Define collision-safe string/key semantics in ADR-009 and implement them. Either reject ill-formed Unicode deterministically before encoding or define an injective encoding/tie-break rule. Add golden, rejection/collision, and opposite-construction-order tests covering lone surrogates and U+FFFD.",
+        "severity": "BLOCKER",
+        "title": "UTF-8 key collisions violate INV-22"
+      },
+      {
+        "evidence": "canonical.ts uses `new Set<string>()`, `Uint8Array.of`, `new Uint8Array`, Uint8Array.prototype.set, array push/sort, and string prototype methods during encoder calls. These can be monkeypatched after module initialization and are not included in the ADR's exhaustive capture list or monkeypatch suite.",
+        "id": "REVIEW-002",
+        "required_change": "Capture or eliminate every mutable operation used by encoding, sorting, duplicate detection, byte construction, and string processing. Update ADR-009's exhaustive list and add post-import hostile monkeypatch tests proving unchanged bytes/errors and zero hostile-code invocations for each dependency.",
+        "severity": "MAJOR",
+        "title": "Encoder still resolves mutable intrinsics after import"
+      },
+      {
+        "evidence": "The authoritative automated validation ran dependency installation, diff check, lint, and tests. It did not show `npm run compile` or `npm run boundary`, despite both being required by the task. The automated output also warns that no typecheck/build script exists.",
+        "id": "REVIEW-003",
+        "required_change": "Run and provide successful output for the repository compile/strict-typecheck and dependency-boundary commands, plus the complete CI-equivalent gate, after correcting the implementation.",
+        "severity": "MAJOR",
+        "title": "Required validation evidence is incomplete"
+      }
+    ],
+    "invariants_checked": [
+      "INV-22 canonical-byte equality across logically equal states and construction paths",
+      "INV-13 insertion-order-independent canonical iteration",
+      "INV-23 safe-integer admission bounds",
+      "INV-26 package dependency boundaries",
+      "No Math.random, Date, external entropy, locale-sensitive ordering, or JSON canonicalization",
+      "No StateHash implementation before encoder acceptance",
+      "Accessor and Proxy non-execution guarantees"
+    ],
+    "risks": [
+      "Canonical bytes currently depend on object construction order for colliding UTF-8 key encodings.",
+      "Post-import monkeypatches can change output, cause non-CanonicalEncoderError failures, or execute hostile code.",
+      "Cycle handling is not specified or tested, so cyclic admitted-looking containers may fail via uncontrolled recursion rather than documented rejection."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The candidate is not safe to accept. Canonical object encoding violates INV-22 for distinct JavaScript keys that TextEncoder maps to identical UTF-8 bytes, multiple mutable intrinsics remain resolved during encoder calls, and required compile/boundary validation is absent from the authoritative automated output.",
+    "task_id": "TASK-0005",
+    "validation_assessment": {
+      "missing": [
+        "Authoritative `npm run compile` output",
+        "Authoritative `npm run boundary` output",
+        "CI-equivalent validation after fixes",
+        "Unicode surrogate/key-collision regression tests",
+        "Monkeypatch tests for all remaining runtime-resolved mutable intrinsics"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 1,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0005"
+}

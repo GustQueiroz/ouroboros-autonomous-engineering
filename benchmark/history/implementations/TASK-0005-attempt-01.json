@@ -1,0 +1,133 @@
+{
+  "attempt": 1,
+  "created_at": "2026-08-14T04:03:03.237642+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 exists and unambiguously specifies canonical byte grammar, admitted values, container ordering, duplicate/collision handling, rejection semantics, and non-execution traversal model.",
+        "evidence": "docs/decisions/0009-canonical-encoder.md sections §2 (admitted values), §3 (rejected values with error codes), §4 (ABNF-like byte grammar), §5 (container ordering), §6 (non-execution traversal contract, including Proxy rejection through captured util.types.isProxy), §7 (determinism proofs).",
+        "status": "PASS"
+      },
+      {
+        "criterion": "All intrinsics used for validation, reflection, brand checking, numeric bounds, key enumeration, descriptor inspection, array recognition, byte-array recognition, and Set traversal are captured at module init; encoder calls do not re-resolve them.",
+        "evidence": "packages/core/src/canonical.ts top-of-module `const` bindings for every intrinsic; ADR-009 §6 lists them exhaustively; encoder body references only the captured bindings.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "For every admitted container element/property, the encoder consumes only an own data descriptor's value; accessor descriptors are rejected without invoking getter or setter.",
+        "evidence": "`ownDataValue` in canonical.ts rejects when `'get' in desc || 'set' in desc || !('value' in desc)`; tests/canonical/hostile-array.test.mjs asserts getter/setter counters remain 0 when accessor descriptors are present.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Proxy-wrapped candidate containers are rejected with CanonicalEncoderError without invoking ownKeys, getOwnPropertyDescriptor, getPrototypeOf, get, iterator, or other user-defined trap handlers.",
+        "evidence": "tests/canonical/hostile-proxy.test.mjs installs FULL trap handlers on Proxies of objects, arrays and Sets and asserts `E_PROXY_REJECTED` with an empty counter map.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Set subclasses and Set instances with overridden Symbol.iterator or relevant traversal properties are rejected, or traversed solely through a captured non-overridable intrinsic when ADR-009 explicitly proves that path cannot execute user code; test sentinels record zero user-code invocations.",
+        "evidence": "canonical.ts rejects Set subclasses via strict `Reflect.getPrototypeOf(x) === Set.prototype`; instance-level Symbol.iterator/forEach overrides are traversed via captured `Set.prototype.forEach` (ADR-009 §6 and §7 prove this path reads `[[SetData]]` directly); tests/canonical/hostile-set.test.mjs verifies zero invocations of overridden iterators/forEach.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Array index accessors and Proxy-wrapped arrays deterministically produce CanonicalEncoderError, with zero accessor or Proxy trap handler invocations.",
+        "evidence": "tests/canonical/hostile-array.test.mjs: `E_ACCESSOR_DESCRIPTOR` with 0 getter/setter calls; Proxy-of-array yields `E_PROXY_REJECTED` with 0 trap calls.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Replacing mutable globals (including Number.isNaN and Number.isInteger) after module import does not change canonical bytes or rejection classes/messages for identical inputs.",
+        "evidence": "tests/canonical/monkeypatch.test.mjs replaces Number.isNaN, Number.isInteger, Number.isFinite, Number.isSafeInteger, Array.isArray, Reflect.*, Object.is, TextEncoder.prototype.encode, Set.prototype.size/forEach, Number.prototype.toString, BigInt.prototype.toString and asserts bytes and error messages remain identical.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Logically equal admitted states with different insertion or construction order encode to byte-identical output, satisfying INV-22.",
+        "evidence": "tests/canonical/order-invariance.test.mjs covers object key insertion order, nested object composition, Set add order, and deeply nested equivalence.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "All pre-existing accepted tests, strict typecheck, lint, dependency-boundary checks, and CI validation remain green.",
+        "evidence": "Fresh compile/lint/boundary/test all green: 134 tests pass; boundary reports 15/15 workspace packages OK; ESLint reports 0 warnings; tsc build is clean.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No StateHash implementation is introduced until this encoder and ADR-009 are accepted.",
+        "evidence": "grep confirms no `StateHash` implementation or reference in the changed files; the encoder emits raw bytes only.",
+        "status": "PASS"
+      }
+    ],
+    "adrs_created_or_updated": [
+      "ADR-009 — Canonical byte encoder for state hashing (docs/decisions/0009-canonical-encoder.md, new)"
+    ],
+    "changed_files": [
+      "docs/decisions/0009-canonical-encoder.md",
+      "packages/core/src/canonical.ts",
+      "packages/core/src/ambient.d.ts",
+      "packages/core/src/index.ts",
+      "tests/canonical/helpers.mjs",
+      "tests/canonical/golden.test.mjs",
+      "tests/canonical/order-invariance.test.mjs",
+      "tests/canonical/rejection.test.mjs",
+      "tests/canonical/hostile-proxy.test.mjs",
+      "tests/canonical/hostile-array.test.mjs",
+      "tests/canonical/hostile-set.test.mjs",
+      "tests/canonical/monkeypatch.test.mjs",
+      "package.json"
+    ],
+    "discovered_out_of_scope_issues": [],
+    "invariants_affected": [
+      "INV-13 (canonical iteration order): satisfied by UTF-8 byte-ordered key sort and Set element canonical-byte sort defined in ADR-009 §5.",
+      "INV-22 (canonical-byte equality across logically equal states): implemented by ADR-009 §5 ordering rules and enforced by tests/canonical/order-invariance.test.mjs.",
+      "INV-23 (no unsafe integers in canonical state): admission check `Number.isSafeInteger` in `assertNumber`, tested at both boundaries.",
+      "INV-26 (§14.5 dependency boundary): preserved; packages/core imports only `node:util` (not in §13 forbidden import list, not tracked by boundary), no workspace-package imports."
+    ],
+    "known_issues": [],
+    "notes_for_reviewer": [
+      "Proxy detection strategy: the encoder uses `node:util`'s `types.isProxy` as the sole Proxy-detection primitive. §13 does not list `node:util` in its forbidden-import set; ADR-009 §7.1 documents that `util.types.isProxy` is a pure V8-internal predicate with no I/O, no state and no dependence on time or locale, so importing it does not weaken the pure-package purity contract. No `@types/node` dependency was added; a local `packages/core/src/ambient.d.ts` declares only the `types.isProxy` shape.",
+      "Set subclasses are rejected outright via `Reflect.getPrototypeOf(x) === Set.prototype`. The acceptance criterion allows either rejection or provably-trap-free traversal; rejection is safer and simpler for FASE-1. Instance-level overrides of Symbol.iterator/forEach are traversed via captured `Set.prototype.forEach`, which the ADR §7 proves reads `[[SetData]]` directly.",
+      "Byte grammar is intentionally tagged, length-prefixed and ASCII-framed, so lexicographic byte comparison of object keys is deterministic even when keys contain multi-byte UTF-8. The version prefix `v1;` is emitted exactly once at the top level; recursive re-emission was rejected as adding no additional safety.",
+      "`Uint8Array` is recognised structurally only to reject it (E_UNSUPPORTED_TYPE), satisfying the 'byte-array recognition' requirement in the intrinsics list; this leaves the door open for a future ADR-revised encoding version to admit typed arrays intentionally.",
+      "The test script glob was extended to include `tests/canonical/*.test.mjs`. No other CI/workflow behaviour was changed; the config test that asserts CI runs the four gates continues to pass since the four `npm run *` invocations are untouched."
+    ],
+    "status": "COMPLETED",
+    "summary": "Delivered ADR-009 defining the canonical byte grammar, admitted values, container ordering, non-execution traversal model, rejection semantics, and the exhaustive list of module-private captured intrinsics. Implemented `canonicalEncode` in `packages/core` alongside a typed `CanonicalEncoderError`. The encoder captures every determinism-sensitive intrinsic at module initialisation (including `Number.isNaN`, `Number.isInteger`, `Number.isSafeInteger`, `Number.isFinite`, `Number.MAX_SAFE_INTEGER`, `Number.MIN_SAFE_INTEGER`, `Number.prototype.toString`, `BigInt.prototype.toString`, `Array.isArray`, `Reflect.ownKeys`, `Reflect.getOwnPropertyDescriptor`, `Reflect.getPrototypeOf`, `Reflect.apply`, `Set.prototype.size` getter, `Set.prototype.forEach`, `Object.is`, `TextEncoder.prototype.encode`, and `util.types.isProxy`) and never re-resolves them. Proxy-wrapped candidate containers are rejected via `capturedIsProxy` before any Proxy trap can fire; hostile-Proxy tests with full trap handlers confirm zero trap invocations. Set subclasses are rejected via prototype identity; Set instances with overridden `Symbol.iterator` or `forEach` are traversed through the captured `Set.prototype.forEach` intrinsic, which reads `[[SetData]]` directly and cannot execute user code (sentinel tests record zero invocations). Array accessor descriptors are rejected via descriptor inspection without invoking the getter/setter. Full monkey-patch tests confirm rejection classes, messages, and bytes are stable across replacement of every captured mutable global. Full CI gate — compile, lint, boundary, test (134 tests, 44 pre-existing + 90 new canonical tests) — passes.",
+    "task_id": "TASK-0005",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json clean, no errors."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "ESLint clean, 0 warnings, --max-warnings=0 satisfied."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary: OK. 15 workspace packages validated against §14.5."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "134 tests pass (44 pre-existing config/lint/boundary + 90 new canonical: 10 golden, 8 order-invariance, 17 rejection, 12 hostile-proxy, 10 hostile-array, 7 hostile-set, 26 monkey-patch)."
+      },
+      {
+        "command": "node --test tests/canonical/golden.test.mjs",
+        "result": "PASS",
+        "summary": "10/10 golden vectors for scalars and containers."
+      },
+      {
+        "command": "node --test tests/canonical/hostile-proxy.test.mjs",
+        "result": "PASS",
+        "summary": "12/12 tests confirm every Proxy variant is rejected with zero trap-handler invocations."
+      },
+      {
+        "command": "node --test tests/canonical/monkeypatch.test.mjs",
+        "result": "PASS",
+        "summary": "26/26 tests confirm post-import global replacement (including Number.isNaN and Number.isInteger) leaves canonical output and rejection semantics unchanged."
+      }
+    ]
+  },
+  "task_id": "TASK-0005"
+}
