@@ -1,0 +1,116 @@
+{
+  "created_at": "2026-08-14T04:30:10.841076+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 exists and unambiguously specifies the canonical byte grammar, admitted values, container ordering, duplicate or collision handling, rejection semantics, and non-execution traversal model before the implementation depends on those decisions.",
+        "evidence": "docs/decisions/0009-canonical-encoder.md admits plain objects, arrays, and Sets without excluding cyclic graphs or defining cycle/reference semantics. The grammar is recursive but provides no finite representation or rejection rule for cycles.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "All intrinsics used for validation, reflection, brand checking, numeric bounds, key enumeration, descriptor inspection, array recognition, byte-array recognition, and Set traversal are captured in module-private constant bindings at module initialization; encoder calls do not resolve their mutable global properties again.",
+        "evidence": "packages/core/src/canonical.ts captures the numeric predicates and bounds, Reflect operations, array operations, Set size/forEach primitives, Uint8Array construction/set, string inspection methods, TextEncoder encode method, and conversion methods at initialization.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "For every admitted container element or property, the encoder consumes only an own data descriptor's value; accessor descriptors are rejected with CanonicalEncoderError without invoking their getter or setter.",
+        "evidence": "ownDataValue uses captured Reflect.getOwnPropertyDescriptor and rejects accessors before reading their values, and the array test verifies zero getter/setter calls. However, no corresponding hostile plain-object accessor test appears in the candidate tests, leaving the required property path unvalidated.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Proxy-wrapped candidate containers are rejected with CanonicalEncoderError without invoking ownKeys, getOwnPropertyDescriptor, getPrototypeOf, get, iterator, or other user-defined trap handlers.",
+        "evidence": "encodeValue calls captured util.types.isProxy before container reflection; hostile-proxy.test.mjs covers full and individual traps, arrays, Sets, nested proxies, and revoked proxies with zero trap calls.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Set subclasses and Set instances with overridden Symbol.iterator or relevant traversal properties are rejected, or traversed solely through a captured non-overridable intrinsic with zero user-code invocations.",
+        "evidence": "Set subclasses are rejected by prototype identity. Vanilla Sets with overridden instance Symbol.iterator and forEach are traversed using captured Set.prototype.forEach, and tests assert zero override invocations.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Array index accessors and Proxy-wrapped arrays deterministically produce CanonicalEncoderError, with zero accessor or Proxy trap handler invocations.",
+        "evidence": "hostile-array.test.mjs verifies E_ACCESSOR_DESCRIPTOR with zero getter/setter calls and E_PROXY_REJECTED with zero traps.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Replacing mutable globals, including Number.isNaN and Number.isInteger, after module import does not change canonical bytes or rejection classes/messages for identical inputs.",
+        "evidence": "monkeypatch.test.mjs exercises numeric predicates, reflection methods, Object.is, array methods, Set primitives, Uint8Array construction/set, string methods, number conversion methods, and TextEncoder after import; the automated test run includes these tests and passes.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Logically equal admitted states with different insertion or construction order encode to byte-identical output, satisfying INV-22.",
+        "evidence": "order-invariance.test.mjs covers objects, nested objects, Sets, and deeply nested states constructed in different orders; hostile-string tests close the lone-surrogate UTF-8 collision by deterministic rejection.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "All pre-existing accepted tests, strict typecheck, lint, dependency-boundary checks, and CI validation remain green.",
+        "evidence": "Automated validation independently confirms lint and 157 tests only. It did not run npm run compile or npm run boundary. The implementer report asserts those commands passed but supplies summaries rather than captured command output, which is insufficient under the required validation discipline.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "No StateHash implementation is introduced until this encoder and ADR-009 are accepted.",
+        "evidence": "The candidate diff introduces canonicalEncode and ADR-009 but no StateHash or hash-function implementation.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "ADR-009 §2 admits plain objects, arrays, and Sets without an acyclic restriction or cycle rejection rule. encodeObject, encodeArray, and encodeSet recursively call encodeValue without an active-container identity check. Inputs such as const a=[]; a.push(a), const o={}; o.self=o, or const s=new Set(); s.add(s) therefore recurse until a native RangeError rather than producing canonical bytes or a documented CanonicalEncoderError.",
+        "id": "REVIEW-001",
+        "required_change": "Define cycle and shared-reference semantics in ADR-009. If cycles are rejected, add a stable CanonicalEncoderError code/message and detect active-path cycles without executing user code; add deterministic tests for self and mutual cycles in arrays, objects, and Sets. If cycles are admitted, define and implement an unambiguous canonical reference grammar with construction-order invariance.",
+        "severity": "MAJOR",
+        "title": "Cyclic containers are admitted but cause uncontrolled recursion"
+      },
+      {
+        "evidence": "The candidate includes an array index accessor sentinel but no test constructing a plain object with an own getter/setter and asserting E_ACCESSOR_DESCRIPTOR with both invocation counters remaining zero. This is a required hostile property path and is distinct from array handling.",
+        "id": "REVIEW-002",
+        "required_change": "Add focused tests for enumerable and non-enumerable own accessor properties on admitted plain and null-prototype objects, including nested cases, asserting CanonicalEncoderError, the documented code/path, and zero getter/setter invocations.",
+        "severity": "MAJOR",
+        "title": "Required plain-object accessor sentinel coverage is absent"
+      },
+      {
+        "evidence": "Automated validation ran npm ci, git diff --check, lint, and tests, but did not run npm run compile or npm run boundary. The required acceptance gate explicitly includes strict typecheck and dependency-boundary validation; the implementer report contains only claimed summaries for those commands.",
+        "id": "REVIEW-003",
+        "required_change": "Run and provide successful captured output for npm run compile and npm run boundary on the exact candidate state, together with the existing lint and full-test gates.",
+        "severity": "MAJOR",
+        "title": "Required compile and dependency-boundary validation is not independently evidenced"
+      }
+    ],
+    "invariants_checked": [
+      "INV-22 canonical-byte equality across object and Set construction order",
+      "Safe-integer-only number encoding and explicit number/bigint distinction",
+      "Rejection of NaN, infinities, negative zero, undefined, unsupported values, symbols, sparse arrays, and extra array keys",
+      "Descriptor-only array and object value access",
+      "Proxy rejection before reflection or trap execution",
+      "Captured-intrinsic immunity to post-import global replacement",
+      "No locale-sensitive sorting, JSON canonicalization, time, randomness, or external entropy",
+      "No StateHash implementation introduced",
+      "Package dependency direction as represented by the candidate source import"
+    ],
+    "risks": [
+      "Cyclic or mutually recursive admitted containers can cause stack exhaustion and leak a native RangeError instead of deterministic CanonicalEncoderError semantics.",
+      "The untested plain-object accessor path could regress without the required sentinel suite.",
+      "The node:util dependency and ambient declaration have not been independently confirmed by the supplied automated compile and boundary gates."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The encoder covers the primary hostile traversal and monkey-patching cases, but ADR-009 admits cyclic containers without defining cycle semantics, while the implementation recurses until a native stack failure. Required plain-object accessor coverage and independently evidenced compile/dependency-boundary validation are also missing.",
+    "task_id": "TASK-0005",
+    "validation_assessment": {
+      "missing": [
+        "Captured successful npm run compile output for the exact candidate state",
+        "Captured successful npm run boundary output for the exact candidate state",
+        "Cycle rejection/encoding tests",
+        "Plain-object accessor zero-invocation tests"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 2,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0005"
+}
