@@ -1,0 +1,69 @@
+{
+  "attempt": 3,
+  "created_at": "2026-08-14T08:56:44.167004+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "changed_files": [
+      "docs/decisions/0009-canonical-encoder.md",
+      "packages/core/src/index.ts",
+      "tests/core/canonical-encoder.test.mjs"
+    ],
+    "findings": [
+      {
+        "finding_id": "REVIEW-001",
+        "resolution": "ADR-009 now normatively requires the value's prototype to be exactly Array.prototype / Set.prototype / Map.prototype, forbids any own symbol-keyed property (including a shadowed Symbol.iterator), forbids accessor descriptors at array indices, and specifies that array elements are read via Object.getOwnPropertyDescriptor(arr, i).value rather than by property access. encodeArray/encodeSet/encodeMap enforce these rules and surface every rejection as CanonicalEncoderError with codes UNSUPPORTED_TYPE / SYMBOL_KEY / ACCESSOR_PROPERTY. New tests prove that Array subclasses, Set subclasses, Map subclasses, and shadowed Symbol.iterator on any of the three are rejected without invoking user code, and that accessor descriptors at array indices are rejected before their getter/setter runs (called===false assertions verify non-invocation).",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-002",
+        "resolution": "ADR-009 now normatively restricts admitted Array own property names to the built-in length plus the string form of each integer index in [0, length); any other own name raises UNSUPPORTED_TYPE and any own symbol key raises SYMBOL_KEY. Admitted Set/Map values must have no own properties at all (UNSUPPORTED_TYPE for string-keyed, SYMBOL_KEY for symbol-keyed). encodeArray inspects Object.getOwnPropertyNames and Object.getOwnPropertySymbols and rejects unexpected names; assertNoOwnPropertiesOnCollection covers Set/Map. New tests prove arr.extra, arr['01'], arr[Symbol('tag')], set.extra, set[Symbol('tag')], map.extra, and map[Symbol('tag')] are each rejected so distinct runtime states can no longer share bytes.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-003",
+        "resolution": "Executed and captured successful output for every required validation command against the final candidate: `npm run compile` (tsc -b, no diagnostics, exit 0), `npm run boundary` ('dependency-boundary: OK. 15 workspace packages validated against §14.5.'), `npm run lint` (eslint --max-warnings=0, exit 0), and `npm test` (125 pass / 0 fail across config, lint, boundary, and core suites; the core encoder suite alone is 81 pass / 0 fail after adding 17 new tests for the collection-admissibility rules).",
+        "status": "RESOLVED"
+      }
+    ],
+    "notes_for_reviewer": [
+      "ADR-009 admissibility rules for Array/Set/Map are stated in §2 of the ADR and enforced by encodeArray, encodeSet, encodeMap, and the shared assertNoOwnPropertiesOnCollection helper. §5 (Unsupported values) was extended to list subclass instances, unexpected own collection properties, and array-index accessors as explicit rejection cases with their codes.",
+      "For arrays, elements are now read exclusively via Object.getOwnPropertyDescriptor(arr, i).value; the previous value[i] read path could invoke a getter installed at that index and is no longer used.",
+      "For Set and Map, exact-prototype checks combined with the no-own-properties rule guarantee that the for-of iteration dispatches to the intrinsic collection iterator inherited from the collection's prototype, so a shadowed own Symbol.iterator is rejected before any custom iterator can run. Tests assert called===false to prove non-invocation.",
+      "The pre-existing modifications to package.json and packages/core/package.json were already in the candidate before this rework and are not touched by this iteration. Only the encoder source, the ADR, and the new test file changed in this pass.",
+      "No hash, RNG, ledger, world, application, or Electron implementation was introduced; scope is unchanged from the original task."
+    ],
+    "remaining_issues": [],
+    "review_iteration": 2,
+    "status": "COMPLETED",
+    "summary": "Addressed the three MAJOR findings by (a) closing off user-controlled code paths in Array/Set/Map encoding via exact-prototype checks, own-property inspection, and descriptor-based array element reads, (b) rejecting all unexpected own properties on admitted collections so no runtime state is silently discarded, and (c) executing and providing evidence for npm run compile, boundary, lint, and the complete test suite. ADR-009 was updated to normatively state the new collection admissibility rules; 17 focused unit tests were added to cover accessor array indices, subclass instances, extra own string- and symbol-keyed properties, and shadowed Symbol.iterator overrides.",
+    "task_id": "TASK-0007",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json completed with no diagnostics (exit 0)."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary: OK. 15 workspace packages validated against §14.5."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . completed with no warnings or errors (exit 0)."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "125 tests pass, 0 fail across config/lint/boundary/core suites."
+      },
+      {
+        "command": "node --test tests/core/canonical-encoder.test.mjs",
+        "result": "PASS",
+        "summary": "81 canonical encoder tests pass, 0 fail (17 new admissibility tests added: accessor array indices, throwing/setter-only accessors, Array/Set/Map subclass rejection, extra own string- and symbol-keyed properties on all three collection kinds, shadowed Symbol.iterator on all three collection kinds with non-invocation assertions)."
+      }
+    ]
+  },
+  "task_id": "TASK-0007"
+}

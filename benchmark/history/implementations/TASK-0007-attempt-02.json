@@ -1,0 +1,65 @@
+{
+  "attempt": 2,
+  "created_at": "2026-08-14T08:50:39.059107+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "changed_files": [
+      "docs/decisions/0009-canonical-encoder.md",
+      "packages/core/src/index.ts",
+      "tests/core/canonical-encoder.test.mjs",
+      "package.json",
+      "packages/core/package.json"
+    ],
+    "findings": [
+      {
+        "finding_id": "REVIEW-001",
+        "resolution": "Added ILL_FORMED_STRING error code and assertWellFormedString helper that scans for unpaired UTF-16 surrogates. Applied it to string values (encodeString), plain-object property keys (encodeObject), and encodingVersion (canonicalEncode). Updated ADR-009 §2 STRING and §5 to require well-formed UTF-16 across values, keys, and encodingVersion. Added tests: lone high surrogate, lone low surrogate, distinct lone surrogates rejected, surrogates inside object keys, Set elements, Map keys, encodingVersion; well-formed surrogate pair still accepted.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-002",
+        "resolution": "encodeObject now inspects each descriptor and throws CanonicalEncoderError with ACCESSOR_PROPERTY code when descriptor.get or descriptor.set is defined, before any property access. Property values are now read from descriptor.value rather than record[name], so no user code executes during encoding. Updated ADR-009 §2 OBJECT and §5 to document the accessor-descriptor rejection. Added tests: getter not invoked, throwing getter surfaces ACCESSOR_PROPERTY (not the getter's error), stateful getter never observed, setter-only accessor rejected, nested accessor rejected, non-enumerable accessors still ignored.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-003",
+        "resolution": "Executed and captured successful output for npm run compile, npm run boundary, npm run lint, and npm test (108 tests pass, 0 failures).",
+        "status": "RESOLVED"
+      }
+    ],
+    "notes_for_reviewer": [
+      "Well-formedness check scans char codes directly; no JSON.stringify or other lint-forbidden constructs are introduced (a JSON.stringify usage was replaced with plain string interpolation in error messages after lint caught it).",
+      "encodeObject now reads value from descriptor.value; this preserves the previous public behaviour for data properties (Object.getOwnPropertyDescriptor.value == record[name] for data descriptors) while eliminating any accessor invocation surface.",
+      "encodingVersion validation now runs both existing type/non-empty check and the new well-formedness check.",
+      "package.json and packages/core/package.json were modified in the prior implementation pass and were not touched again here; they remain part of the candidate diff."
+    ],
+    "remaining_issues": [],
+    "review_iteration": 1,
+    "status": "COMPLETED",
+    "summary": "Addressed the three review findings: rejected ill-formed UTF-16 strings uniformly across values, object keys, and encodingVersion with a new ILL_FORMED_STRING code; rejected plain-object accessor descriptors without invoking them with a new ACCESSOR_PROPERTY code (values now come from the descriptor's value field, so no getter can execute); updated ADR-009 to normatively document both rules; added collision and behavioural tests; and ran compile, boundary, lint, and the full test suite to completion.",
+    "task_id": "TASK-0007",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json completed with no errors across all 15 workspace projects."
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary: OK. 15 workspace packages validated against §14.5."
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . completed with 0 problems."
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "node --test across config, lint, boundary, and core suites: 108 tests, 108 pass, 0 fail."
+      }
+    ]
+  },
+  "task_id": "TASK-0007"
+}

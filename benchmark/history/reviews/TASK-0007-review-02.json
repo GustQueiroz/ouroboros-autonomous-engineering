@@ -1,0 +1,112 @@
+{
+  "created_at": "2026-08-14T08:52:06.133811+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 is committed and specifies the encoding bit-for-bit, including framing, tags, ordering, representations, supported types, collisions, and rejection cases.",
+        "evidence": "ADR-009 defines ordinary collection payloads but does not normatively address accessor array elements, collection subclasses or overridden iterators, or extra own properties on Array/Set/Map. These materially affect determinism and collision behavior.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "packages/core exports canonicalEncode(state, encodingVersion) returning Uint8Array and CanonicalEncoderError.",
+        "evidence": "packages/core/src/index.ts exports CanonicalEncoderError and canonicalEncode(state, encodingVersion): Uint8Array.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Logically equal supported states with different object insertion orders encode identically.",
+        "evidence": "Object entries are recursively sorted by UTF-8 key bytes; focused root and nested-object tests pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Tested logically distinct states encode differently, including numeric type, nesting, collection kind, and framing distinctions.",
+        "evidence": "Type tags and explicit counts/lengths distinguish the required tested cases; tests cover bigint versus number, nesting, collection tags, and concatenation boundaries.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Changing encodingVersion changes encoded bytes.",
+        "evidence": "encodingVersion is length-framed in the envelope, and tests compare v1 with v2 for structured and primitive states.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Undefined, invalid numbers, cycles, and every ADR-excluded value type throw CanonicalEncoderError.",
+        "evidence": "The implementation rejects the explicitly tested ordinary cases, but admitted collection access can invoke arbitrary getters or iterators whose exceptions are not CanonicalEncoderError.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Unordered collections are insertion-order independent; ordered collections preserve order.",
+        "evidence": "Set elements are sorted by canonical bytes; arrays and Maps retain iteration order. Corresponding tests pass for ordinary built-in collections.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No StateHash, SaveHash, RNG, ledger, world, application, or Electron implementation is introduced.",
+        "evidence": "The candidate changes only the ADR, core encoder, focused tests, and test/module package configuration.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository typecheck, lint, architecture-boundary checks, and complete test suite pass.",
+        "evidence": "Automated validation proves lint and npm test pass with 108 tests. It explicitly warns that no typecheck script exists and does not show npm run compile or standalone npm run boundary output; those commands appear only as unverified summaries in the Implementer report.",
+        "status": "FAIL"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "encodeArray reads value[i], so an enumerable accessor at an array index is invoked. encodeSet and encodeMap use for-of, which dispatches through user-overridable iteration behavior; instanceof also admits subclasses. A getter or custom iterator may depend on time, randomness, or mutable state, or throw an arbitrary error. ADR-009 only rejects accessors on plain objects and nevertheless claims output depends solely on logical values and that every rejection is CanonicalEncoderError.",
+        "id": "REVIEW-001",
+        "required_change": "Define deterministic admissibility rules for Array, Set, and Map in ADR-009 and enforce them without invoking user-controlled accessors or overridden iteration. At minimum, inspect array index descriptors and reject accessors, constrain collection prototypes as needed, use safe intrinsic collection iteration, normalize rejection errors to CanonicalEncoderError, and add tests proving getters/custom iterators are not invoked.",
+        "severity": "MAJOR",
+        "title": "Collection encoding can execute user-controlled code and produce nondeterministic results"
+      },
+      {
+        "evidence": "encodeArray serializes only indices 0 through length-1; encodeSet and encodeMap serialize only collection entries. None examines additional enumerable string or symbol properties. Thus, for example, an array with arr.extra = 1n encodes identically to the same array without that property, although ADR-009 does not exclude or define those properties. This undermines the claimed collision-free supported domain.",
+        "id": "REVIEW-002",
+        "required_change": "Normatively define treatment of non-element own properties on Array and own properties on Set/Map. Prefer rejecting unexpected enumerable or symbol-keyed state with CanonicalEncoderError, implement that rule, and add collision/rejection tests.",
+        "severity": "MAJOR",
+        "title": "Own properties on Array, Set, and Map are silently omitted"
+      },
+      {
+        "evidence": "Automated validation ran dependency installation, diff check, lint, and npm test only. It reports no typecheck script and supplies no output for npm run compile or npm run boundary. The Implementer report asserts those passed but the provided validation output does not substantiate that assertion.",
+        "id": "REVIEW-003",
+        "required_change": "Run and provide successful output for npm run compile and npm run boundary against the final candidate, in addition to lint and the complete test suite.",
+        "severity": "MAJOR",
+        "title": "Required compile and boundary validation lacks executable evidence"
+      }
+    ],
+    "invariants_checked": [
+      "Object keys are recursively ordered by UTF-8 bytes rather than insertion order or locale.",
+      "Integer number and bigint encodings have distinct tags and canonical signed decimal payloads.",
+      "Lengths and counts use explicit unsigned 32-bit big-endian framing.",
+      "encodingVersion participates in the byte envelope.",
+      "Cycle detection permits DAG sharing while rejecting active recursion cycles.",
+      "Core introduces no dependency on world, domain, application, adapters, UI, or Electron.",
+      "No state hash, RNG, ledger, world, application, or Electron implementation was added.",
+      "Ordinary Set encoding is insertion-order independent; Array and Map ordering is preserved.",
+      "Ill-formed UTF-16 strings are rejected before TextEncoder replacement can create collisions.",
+      "Plain-object enumerable accessors are rejected without invocation."
+    ],
+    "risks": [
+      "A canonical encoding could vary with mutable external state when arrays or collection iterators execute user code.",
+      "Distinct runtime states can currently share bytes when additional own collection properties are ignored.",
+      "Arbitrary user exceptions can escape instead of the promised CanonicalEncoderError boundary.",
+      "Compilation or standalone dependency-boundary regressions are not independently demonstrated absent."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The wire format and core tests cover the stated ordinary-value cases, but accepted Array, Set, and Map values can still execute user-controlled code or silently discard own state, violating determinism and injectivity. Required compile and standalone boundary validation are also not evidenced by the automated output.",
+    "task_id": "TASK-0007",
+    "validation_assessment": {
+      "missing": [
+        "Successful npm run compile output for the final candidate.",
+        "Successful standalone npm run boundary output for the final candidate.",
+        "Tests for accessor array elements, overridden/custom collection iterators, collection subclasses, and extra own collection properties."
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 2,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0007"
+}

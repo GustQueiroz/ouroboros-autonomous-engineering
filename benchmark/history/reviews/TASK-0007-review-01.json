@@ -1,0 +1,112 @@
+{
+  "created_at": "2026-08-14T08:47:03.790327+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 specifies the complete bit-for-bit canonical encoding and rejection domain.",
+        "evidence": "ADR-009 admits all JavaScript strings and specifies WHATWG TextEncoder replacement of unpaired surrogates, but does not address the resulting collisions or reject accessor properties.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "packages/core exports canonicalEncode(state, encodingVersion) returning Uint8Array and CanonicalEncoderError.",
+        "evidence": "packages/core/src/index.ts exports both symbols with the required return and error types.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Logically equal supported states encode to byte-identical output.",
+        "evidence": "Object keys are recursively sorted by UTF-8 bytes; focused recursive and insertion-order tests pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Each logically distinct supported state encodes differently.",
+        "evidence": "TextEncoder maps distinct lone-surrogate strings such as \"\\uD800\" and \"\\uD801\" to the same UTF-8 replacement-character bytes. The same collision affects object keys and encodingVersion.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Changing encodingVersion changes encoded bytes for the same state.",
+        "evidence": "Distinct versions containing different lone surrogates encode identically because both are converted to U+FFFD by TextEncoder.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Invalid and ADR-excluded values throw CanonicalEncoderError.",
+        "evidence": "Enumerable accessor properties are not excluded by ADR-009, and encodeObject evaluates record[name]. A throwing getter propagates an arbitrary exception rather than CanonicalEncoderError.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Unordered collections are insertion-order invariant and ordered collections preserve order.",
+        "evidence": "Objects and Sets are canonically sorted, while Arrays and Maps retain iteration order; corresponding tests pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No StateHash, SaveHash, RNG, ledger, world, application, or Electron implementation is introduced.",
+        "evidence": "The candidate changes only the ADR, core encoder, core package metadata, root test command, and focused tests.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository typecheck, lint, architecture-boundary checks, and complete tests pass.",
+        "evidence": "Automated validation proves lint and 92 tests pass, but did not run npm run compile or npm run boundary. The Implementer report asserts those results without captured command output.",
+        "status": "FAIL"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "encodeString, object-key encoding, and encodingVersion framing pass JavaScript strings directly through TextEncoder. WHATWG replacement maps every lone surrogate to U+FFFD, so canonicalEncode(\"\\uD800\", \"v1\") equals canonicalEncode(\"\\uD801\", \"v1\"). Likewise, versions \"\\uD800\" and \"\\uD801\" do not change output, and distinct object keys can collapse to identical framed key bytes. ADR-009 explicitly documents replacement while claiming distinct logical states cannot collide.",
+        "id": "REVIEW-001",
+        "required_change": "Make the normative string domain injective and align implementation and tests. A suitable in-scope correction is to reject any ill-formed UTF-16 string in values, object keys, and encodingVersion with CanonicalEncoderError, document that rejection in ADR-009, and add collision-focused tests for lone high/low surrogates and distinct encodingVersion values.",
+        "severity": "BLOCKER",
+        "title": "Distinct supported strings and versions can share identical bytes"
+      },
+      {
+        "evidence": "encodeObject obtains a property descriptor but then reads record[name], invoking enumerable getters. A getter can depend on time, randomness, mutable external state, or throw an arbitrary error. ADR-009 neither excludes accessors nor defines their evaluation, contradicting its determinism and universal CanonicalEncoderError claims.",
+        "id": "REVIEW-002",
+        "required_change": "Define plain canonical records as enumerable own data properties, reject accessor descriptors with CanonicalEncoderError before invoking them, and add tests for returning, stateful, and throwing getters.",
+        "severity": "MAJOR",
+        "title": "Plain-object accessors can introduce nondeterminism and noncanonical failures"
+      },
+      {
+        "evidence": "Automated validation ran dependency install, diff check, lint, and test only, and explicitly warns that no typecheck script was found. It did not run the repository's npm run compile or npm run boundary commands required by the task.",
+        "id": "REVIEW-003",
+        "required_change": "Run and provide successful output for npm run compile and npm run boundary after correcting the implementation, along with lint and the complete test suite.",
+        "severity": "MAJOR",
+        "title": "Required compile and boundary validation is not independently evidenced"
+      }
+    ],
+    "invariants_checked": [
+      "Core dependency isolation",
+      "Deterministic object-key ordering",
+      "Ordered Array and Map behavior",
+      "Unordered Object and Set behavior",
+      "Type and length framing",
+      "Number versus bigint separation",
+      "Version framing",
+      "Cycle rejection and DAG acceptance",
+      "No state hash before canonical encoder acceptance",
+      "No out-of-scope world, ledger, RNG, application, or Electron implementation"
+    ],
+    "risks": [
+      "Future StateHash values could equate logically distinct states or encoding versions.",
+      "Accessor evaluation could make replay bytes depend on external mutable or nondeterministic state.",
+      "Throwing getters can escape the documented CanonicalEncoderError boundary."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The encoder is not injective for its documented string domain, can invoke nondeterministic object accessors, and lacks independently verified compile and boundary validation.",
+    "task_id": "TASK-0007",
+    "validation_assessment": {
+      "missing": [
+        "Successful npm run compile output",
+        "Successful npm run boundary output",
+        "Tests proving lone-surrogate strings, keys, and versions cannot collide",
+        "Tests proving accessor properties are rejected without invocation"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 1,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0007"
+}

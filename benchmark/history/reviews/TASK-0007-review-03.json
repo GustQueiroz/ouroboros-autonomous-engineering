@@ -1,0 +1,99 @@
+{
+  "created_at": "2026-08-14T08:58:04.541193+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 is committed and specifies the encoding bit-for-bit, including framing, tags, ordering, representations, collections, supported types, collisions, and rejection cases.",
+        "evidence": "ADR-009 says plain objects are supported but only enumerable properties are encoded. It neither excludes nor rejects non-enumerable own properties, and §6 nevertheless claims logically distinct states cannot share an encoding.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "packages/core exports canonicalEncode(state, encodingVersion) returning Uint8Array and CanonicalEncoderError.",
+        "evidence": "packages/core/src/index.ts exports CanonicalEncoderError and canonicalEncode(state: unknown, encodingVersion: string): Uint8Array.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Logically equal supported states with different object insertion orders encode identically.",
+        "evidence": "Object keys are recursively sorted by UTF-8 bytes; focused root and nested insertion-order tests pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Tested logically distinct states encode differently, including numeric type, nesting, collection kind, and framing distinctions.",
+        "evidence": "The candidate explicitly tests that a plain object with an additional non-enumerable accessor is accepted and ignored. Likewise, an enumerable property and an otherwise identical non-enumerable data property can produce identical bytes despite being distinct admitted object states.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Changing encodingVersion changes encoded bytes.",
+        "evidence": "encodingVersion is length-framed in the envelope and two version-separation tests pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Undefined, invalid numbers, cycles, and ADR-excluded value types throw CanonicalEncoderError.",
+        "evidence": "Implementation provides dedicated rejection paths and the supplied suite covers required invalid values plus excluded object and collection forms.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Unordered collections are insertion-order independent; ordered collections preserve order.",
+        "evidence": "Objects and Sets are sorted canonically; Arrays and Maps retain order. Corresponding tests pass.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No StateHash, SaveHash, RNG, ledger, world, application, or Electron implementation is introduced.",
+        "evidence": "Candidate changes are limited to the encoder, ADR, tests, test-script inclusion, and core module metadata.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository typecheck, lint, architecture-boundary checks, and complete test suite pass.",
+        "evidence": "Automated validation confirms lint and 125 tests, including boundary tests, but explicitly warns that no typecheck script was run. The implementer reports npm run compile passed but supplies only a summary rather than captured command output.",
+        "status": "FAIL"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "encodeObject obtains all own names but executes `if (descriptor === undefined || descriptor.enumerable !== true) continue;`. The test `acceptance: non-enumerable accessor descriptors are ignored` codifies this omission. Thus `{a: 1n}` and an object with the same enumerable property plus any non-enumerable own property encode identically, even though both pass the plain-object admissibility check. This conflicts with the ADR's injectivity and collision claims and with the task's distinct-state requirement.",
+        "id": "REVIEW-001",
+        "required_change": "Define non-enumerable own properties as unsupported in ADR-009 and reject them with CanonicalEncoderError before encoding, or normatively define and implement an injective representation for them. Replace the test that accepts ignored non-enumerable properties with rejection or distinction coverage.",
+        "severity": "MAJOR",
+        "title": "Non-enumerable plain-object state is silently discarded"
+      },
+      {
+        "evidence": "The automated validation ran install, diff-check, lint, and tests, then warned `No 'typecheck' script is currently defined.` It did not run `npm run compile`. The implementer report asserts compile succeeded but provides no captured stdout/stderr or automated result supporting that assertion.",
+        "id": "REVIEW-002",
+        "required_change": "Run and capture `npm run compile` against the final corrected candidate, with exit code 0, alongside boundary, lint, and the complete test suite.",
+        "severity": "MAJOR",
+        "title": "Required typecheck validation lacks independently verifiable output"
+      }
+    ],
+    "invariants_checked": [
+      "Core contains no dependencies on world, domain, application, adapters, UI, or Electron packages.",
+      "No state hash, save hash, RNG, ledger, world, application, or Electron implementation was introduced.",
+      "Object and Set ordering avoid insertion-order dependence for encoded logical entries.",
+      "Array and Map ordering remains significant.",
+      "Encoding uses explicit tags, big-endian lengths, and version framing.",
+      "Invalid numeric values, cycles, unsupported values, accessors, and collection collisions have dedicated errors.",
+      "No time, randomness, locale collation, native hashing, or platform-endian encoding is used.",
+      "Existing lint and test validation remains green."
+    ],
+    "risks": [
+      "Silently omitted non-enumerable properties can cause distinct runtime state graphs to share canonical bytes and therefore undermine any future StateHash or SaveHash built on this encoder.",
+      "The unverified compile step leaves a required repository-level validation gap."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The encoder largely implements the requested format, but it admits plain objects with non-enumerable own properties while silently omitting those properties, allowing distinct admitted states to share bytes. Required typecheck validation is also not independently evidenced by the automated output.",
+    "task_id": "TASK-0007",
+    "validation_assessment": {
+      "missing": [
+        "Captured successful `npm run compile` output for the final candidate after corrections."
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 3,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0007"
+}
