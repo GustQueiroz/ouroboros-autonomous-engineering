@@ -1,0 +1,141 @@
+{
+  "created_at": "2026-08-14T10:26:53.213960+00:00",
+  "cycle_id": "CYCLE-000089",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "docs/decisions/ADR-009.md exists and is merged to main",
+          "ADR specifies: UTF-8 byte key ordering applied recursively to all object keys",
+          "ADR specifies: bigint encoded as decimal ASCII with explicit sign, no leading zeros, no exponent notation",
+          "ADR specifies: safe integer (number) encoded with a distinct type marker so 1n and 1 never collide",
+          "ADR specifies: undefined, NaN, Infinity, -0 are errors, not silently normalized",
+          "ADR specifies: ordered (Array) and unordered (Set, Map) collection encoding with normative ordering for unordered collections",
+          "ADR specifies: non-enumerable own properties are unsupported and cause CanonicalEncoderError",
+          "ADR specifies: lone UTF-16 surrogates in strings are unsupported and cause CanonicalEncoderError",
+          "ADR specifies: encodingVersion participates in all canonical hashes",
+          "No implementation is submitted with or before this ADR"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-009",
+          "§12 INV-22",
+          "§15 FASE-1 acceptance criteria",
+          "§16 item 7",
+          "§19 §DEFINIR protocol"
+        ],
+        "title": "Write ADR-009: CanonicalEncoder specification document",
+        "why_now": "docs/decisions/ is empty after 33+ cycles. The spec explicitly requires 'ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir' (FASE-1 acceptance). Every encoder implementation attempt (TASK-0004 through TASK-0008) has been rejected because the ADR either did not exist or was written alongside the implementation rather than before it. TASK-0008-review-02 confirms 'the accepted baseline contains neither ADR-009 nor a CanonicalEncoder.' No further encoder implementation should be attempted until the ADR is accepted on its own. The ADR must resolve the non-enumerable-property policy (contested in the TASK-0008 cycle) and the lone UTF-16 surrogate handling (root cause of previous INV-22 failures)."
+      },
+      {
+        "acceptance_targets": [
+          "Branded (nominal) types exported from @ciclo/core: Money, Quantity, Price, Rate, Tick",
+          "Scale constants exported: QUANTITY_SCALE=100_000_000, PRICE_SCALE=10_000, RATE_SCALE=100_000_000",
+          "Constructors reject non-integer inputs, non-bigint economic values, and values outside safe-integer range for Tick",
+          "INV-23 test: property test over a simulated long replay confirms no safe-integer type exceeds 2^53-1",
+          "All four CI gates (compile, lint, boundary, test) pass after the change",
+          "No floating-point literals or transcendental Math functions introduced"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003",
+          "§3 ADR-004",
+          "§4 domain glossary",
+          "§12 INV-23",
+          "§13 lint prohibitions",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Implement @ciclo/core nominal types and scale constants",
+        "why_now": "packages/core/src/index.ts contains only 'export {}'. The nominal types Money, Quantity, Price, Rate, and Tick are required by every FASE-1 package (world, domain, application). They do not depend on ADR-009 or any DEFINIR resolution, so they can proceed immediately in parallel with IDEA-001 and unblock the rest of FASE-1 work. Without them, no downstream type-safe arithmetic, no lint enforcement of ADR-003 at the type level, and no INV-23 test is possible."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/ADR-NNN.md specifying the hash function bit-by-bit (e.g. SplitMix64 seeded by FNV-1a accumulation of namespace and coordinate arguments)",
+          "At least three test vectors provided: known inputs and their expected uint64 outputs",
+          "ADR confirms the function is not the native language or runtime hash",
+          "ADR confirms the function satisfies the cross-platform bit-identity requirement of INV-19"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-002",
+          "§12 INV-02",
+          "§12 INV-03",
+          "§12 INV-19",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Write ADR resolving the hash function DEFINIR from ADR-002",
+        "why_now": "ADR-002 marks the hash function as DEFINIR with 'SplitMix64 sobre um acumulador FNV-1a dos argumentos' as the recommended starting point. No ADR exists in docs/decisions/. Without a bit-exact hash function specification (including test vectors), the rand() positional RNG cannot be implemented in a way that will survive review, and without rand(), the entire world-price generation path (§5.1) is blocked. This ADR is a small, self-contained document that unblocks the largest remaining FASE-1 work front."
+      },
+      {
+        "acceptance_targets": [
+          "CanonicalEncoder and CanonicalEncoderError exported from @ciclo/core/src",
+          "Implementation matches every clause of ADR-009 exactly",
+          "INV-22 test suite: identical logical states produce identical bytes; different logical states produce different bytes; finalTick excluded from StateHash; no narrative text influences StateHash",
+          "All four CI gates pass",
+          "No StateHash, SaveHash, or rand() introduced in this task—encoder only"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001: ADR-009 must be accepted before this task is proposed to the Implementer"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-009",
+          "§12 INV-22",
+          "§15 FASE-1 acceptance criteria"
+        ],
+        "title": "Implement CanonicalEncoder in @ciclo/core (fresh, post ADR-009)",
+        "why_now": "Once IDEA-001 (ADR-009) is accepted, the CanonicalEncoder must be implemented from scratch against that ADR. The codebase has no accepted encoder anywhere. Previous attempts were rejected because they introduced the encoder and the ADR simultaneously, used an unaccepted prior implementation as a baseline, or went out of scope. A fresh, narrowly scoped implementation that does exactly what ADR-009 says—nothing more—is the only path to clearing this FASE-1 gate item."
+      },
+      {
+        "acceptance_targets": [
+          "rand(masterSeed, namespace, ...coordinates) exported from @ciclo/core, returning a safe integer (uint53-range)",
+          "Function is pure: no internal state, no global counter, no Math.random",
+          "INV-02 test: rand output at any coordinate equals the output produced by any traversal path through intermediate coordinates",
+          "INV-19 test: same inputs produce same output in worker and CLI contexts (verified by tools/replay pattern)",
+          "All four CI gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003: hash function ADR must be accepted before this task"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002",
+          "§12 INV-02",
+          "§12 INV-03",
+          "§12 INV-19",
+          "§15 FASE-1 scope"
+        ],
+        "title": "Implement rand() positional RNG in @ciclo/core (post hash-function ADR)",
+        "why_now": "Once the hash function ADR (IDEA-003) is accepted, rand(masterSeed, namespace, ...coordinates) can be implemented as a pure function with no mutable state. This is the foundation of all world-price generation (§5.1), macro event scheduling (§5.2), bot decisions (§5.3), and NPC tips (§5.4). INV-02 (the spec's most important test: direct tick-9,000,000 query equals tick-by-tick traversal) and INV-03 (player actions do not alter worldPrice) both depend on rand() existing and being correct."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Infrastructure scaffold is complete (npm monorepo, TypeScript project references, ESLint pure-package rules, boundary checker, CI pipeline with 4 gates, 44 passing tests). All 16 production source files contain only 'export {}'. docs/decisions/ has no ADRs. SPEC_BLOCKERS.md has no recorded blockers. After 33+ benchmark cycles and 8 tasks, only TASK-0002 (npm bootstrap) has been accepted. TASK-0004 through TASK-0008 all attempted CanonicalEncoder work; all were rejected.",
+      "highest_priority_gap": "docs/decisions/ is empty and ADR-009 does not exist, which the spec requires before any CanonicalEncoder implementation can be accepted ('ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir'). All encoder implementation attempts have failed precisely because the authoritative ADR was absent or written concurrently rather than accepted first."
+    },
+    "warnings": [
+      "TASK-0008-review-02 references BLOCKER-0001 as OPEN in SPEC_BLOCKERS.md, but the current main-branch SPEC_BLOCKERS.md records no open blockers. The blocker was apparently written inside the rejected candidate branch and never merged. The underlying ambiguity it described—whether non-enumerable own properties should cause CanonicalEncoderError—remains unresolved on main. ADR-009 (IDEA-001) must address this explicitly rather than leaving it implicit.",
+      "docs/decisions/ contains no ADRs after 33+ cycles. Every DEFINIR item in the spec (hash function, rounding mode enforcement mechanism, IMPACT_WINDOW, BOT_DECISION_PERIOD, octave parameters) remains open. Implementations of any DEFINIR-dependent feature will continue to be rejected at review until the corresponding ADR is written and accepted first. The Implementer should not treat writing ADRs as optional scaffolding—they are acceptance-blocking prerequisites."
+    ]
+  }
+}

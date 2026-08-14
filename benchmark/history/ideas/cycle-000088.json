@@ -1,0 +1,134 @@
+{
+  "created_at": "2026-08-14T10:14:37.400455+00:00",
+  "cycle_id": "CYCLE-000088",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Money, Quantity, Price, Rate exported as branded bigint types with constructors that reject non-bigint input",
+          "Tick exported as branded number type with constructor that rejects non-integer and values outside [-(2^53-1), 2^53-1]",
+          "divide() helper accepts an explicit rounding mode enum (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) and is the only division surface in the package",
+          "Unit tests cover: constructor rejection of invalid inputs, all three rounding modes, notional calculation without safe-integer overflow, INV-23 boundary check",
+          "npm run compile, npm run lint, npm run boundary, and npm run test all exit 0; exact command output and exit codes included in submission evidence"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003 — no floating-point in domain; Money/Quantity/Price/Rate are branded bigint; Tick is branded safe-integer number",
+          "ADR-004 — every division declares TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, or ROUND_HALF_EVEN; rounding residue is journaled",
+          "§15 FASE-1 — core arithmetic is listed first in FASE-1 scope",
+          "INV-23 — no safe-integer value exceeds 2^53 in any ten-year replay",
+          "INV-07 — rounding residue never disappears"
+        ],
+        "title": "Implement branded arithmetic types in packages/core",
+        "why_now": "Money, Quantity, Price, Rate (branded bigint) and Tick (branded safe-integer number) are prerequisites for the ledger, price generator, order types, and every other FASE-1 domain primitive. They have no dependency on the canonical encoder, hash function, or any unresolved DEFINIR item. Six consecutive encoder rejections have consumed all implementation cycles while this foundational layer remains unstarted. Delivering it now unlocks multiple parallel work fronts and produces the first accepted production code in packages/core."
+      },
+      {
+        "acceptance_targets": [
+          "ADR-009 document committed to docs/decisions/ specifying admitted types (null, boolean, safe-integer number with type marker, bigint, string with lone-surrogate rejection policy, plain-object with exact Object.prototype check and UTF-8 key ordering, exact-Array-prototype array), tag byte assignments, and encodingVersion participation",
+          "encodeValue rejects lone surrogates in string values and object keys with a documented CanonicalEncoderError code",
+          "Array.isArray admitting Array subclasses is replaced with exact-prototype check; Set and Map subclasses are explicitly rejected",
+          "Golden-byte tests assert exact hex output for each admitted type and each rejection path",
+          "Non-enumerable own property (data and accessor) causes CanonicalEncoderError without invoking the accessor",
+          "npm run compile, npm run boundary, npm run lint, and npm run test exit codes and full stdout/stderr present in submission evidence"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-009 — canonical encoder requirements: UTF-8 byte key ordering, bigint as signed decimal ASCII, distinct safe-integer marker, prohibition of undefined/NaN/Infinity/-0, encodingVersion participates in hash",
+          "§15 FASE-1 — ADR-009 written and encoder implemented before any state hash exists",
+          "INV-22 — logically equal states produce equal bytes; logically different states produce different bytes",
+          "§16 item 1 — acceptance criteria written before code"
+        ],
+        "title": "Implement ADR-009 canonical encoder as a clean initial delivery",
+        "why_now": "The canonical encoder is a gated FASE-1 requirement: ADR-009 must be written and the encoder implemented before any StateHash exists. TASK-0008 review-01 BLOCKER REVIEW-003 states that landing a full encoder over an empty accepted base without a §19 blocker record is a scope violation — the task was framed as patching TASK-0007 work that was never accepted. The correct resolution is a fresh task that does not reference prior unaccepted work, implements only the types ADR-009 requires, and supplies all four gate evidences (compile, boundary, lint, test) in the submission."
+      },
+      {
+        "acceptance_targets": [
+          "Decision document committed to docs/decisions/ specifying the hash algorithm bit-by-bit (input encoding, accumulator steps, output width)",
+          "Document records rejected alternatives and the reason each was rejected",
+          "Document references the two locked ADR-002 constraints and confirms compliance",
+          "No implementation code in this task — the decision document only; implementation follows as a separate task"
+        ],
+        "category": "architecture",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 — hash function is DEFINIR; must be specified bit-by-bit in ADR; must not be native hash; spec recommends SplitMix64 over FNV-1a accumulator",
+          "§15 FASE-1 — hash and positional RNG are listed in FASE-1 core scope",
+          "§16 item 7 — ADR registered for any DEFINIR item resolved by a feature"
+        ],
+        "title": "Resolve ADR-002 DEFINIR: select and document the hash function",
+        "why_now": "ADR-002 explicitly marks the hash function as DEFINIR with two locked constraints: it must be specified bit-by-bit in an ADR, and it cannot be the language's native hash. No DEFINIR items have been resolved and docs/decisions/ is empty. The hash function is a direct prerequisite for rand() which is a prerequisite for the price generator (two noise layers, FASE-1 scope). Resolving it is a small, self-contained, low-risk step that unblocks a significant FASE-1 work front without touching any contested code."
+      },
+      {
+        "acceptance_targets": [
+          "rand() exported from packages/core, typed as (masterSeed: number, namespace: string, ...coordinates: number[]) => bigint",
+          "Output is uint64 range represented as signed bigint (two's complement)",
+          "Determinism test: same arguments always produce same output across 10,000 calls in any order",
+          "INV-02 smoke test: rand called at coordinate 9_000_000 equals the result of calling sequentially through coordinates 0..9_000_000 with same seed and namespace",
+          "No Math.random(), no Date, no stateful PRNG; lint gate confirms compliance",
+          "npm run compile, npm run boundary, npm run lint, npm run test all exit 0 with evidence in submission"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-003 hash function DEFINIR must be resolved first"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002 — rand(masterSeed, namespace, ...coordinates) -> uint64; positional, stateless, no Math.random()",
+          "INV-02 — price(asset, t) directly equals arriving at t tick-by-tick for any t and any asset",
+          "INV-03 — player actions do not alter any world-base value",
+          "§15 FASE-1 — rng posicional listed in core scope"
+        ],
+        "title": "Implement positional RNG: rand(masterSeed, namespace, ...coordinates)",
+        "why_now": "Once the hash function DEFINIR is resolved (IDEA-003), rand() can be implemented as a pure function with no other dependencies. It is required for every noise layer in the price generator. The spec states the most important test of the project is that price(asset, 9_000_000) reached directly equals price(asset, 9_000_000) reached tick-by-tick — this is directly tested through rand() determinism. Implementing rand() is a short, high-confidence step that produces INV-02-verifiable behavior."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop produces an installable artifact on Windows and Linux via CI",
+          "BrowserWindow created with contextIsolation: true, nodeIntegration: false, sandbox: true",
+          "Preload script exposes an empty allowlist (no channels yet) via contextBridge",
+          "Renderer displays a static placeholder; no domain logic required",
+          "CI job step builds installer and verifies the artifact exists at the expected output path",
+          "INV-29 audit passes: automated test reads the BrowserWindow configuration and asserts all three security flags"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§13 (TRAVADO sequencing) — installer exists in FASE-1, not at the end",
+          "INV-29 — contextIsolation active, nodeIntegration off, sandbox active in all modes including development; preload exposes only allowlisted channels",
+          "§15 FASE-1 aceite — minimal installer for Windows and Linux produced by CI; simulation running in dedicated worker with typed message contract",
+          "CI gate §17 item 7 — installer build on both platforms with artifact reproducibility check"
+        ],
+        "title": "Minimal Electron installer skeleton (empty window, INV-29 compliant)",
+        "why_now": "The spec contains a locked sequencing requirement: the installer must exist in FASE-1. Discovering packaging problems (native module ABI, path resolution, platform-specific build tooling) after core domain code is complete causes architectural rework. An installer that opens an empty window is a FASE-1 gate item and has zero dependency on encoder, arithmetic types, hash, or any other contested FASE-1 work. Starting it now in parallel with domain work is the exact risk-reduction the spec prescribes."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo bootstrap accepted (TASK-0002); all package src/index.ts files contain only `export {}`. No domain code committed. The canonical encoder (ADR-009) has been the sole target for 6 consecutive rejected tasks (TASK-0003 through TASK-0008). TASK-0008 review-01 issued REQUEST_CHANGES with two BLOCKERs: lone-surrogate string collision violating INV-22, and landing a full encoder over an empty accepted base without a §19 blocker record. No ADRs in docs/decisions/; no DEFINIR items resolved.",
+      "highest_priority_gap": "No production domain code exists. FASE-1 requires branded arithmetic types, canonical encoder, hash function, positional RNG, price generator (2 assets, 2 noise layers), double-entry ledger, market orders, CLI replay, performance baseline, minimal installer, and minimal UI — all absent. The encoder spiral is blocking progress; parallel unblocked work (arithmetic types, hash function resolution, installer skeleton) can advance FASE-1 without waiting for the encoder to be accepted."
+    },
+    "warnings": [
+      "TASK-0008 was issued REQUEST_CHANGES at review-01 and no further implementation attempt has been submitted. Its two BLOCKERs (lone-surrogate INV-22 violation and landing full encoder over empty base without §19 record) and two MAJORs (collection subclass ADR contradiction, missing compile/boundary evidence) remain unaddressed. Any new encoder task (IDEA-002) must be scoped as a clean initial delivery, not as a patch of TASK-0007 or TASK-0008 work, to avoid re-triggering BLOCKER REVIEW-003.",
+      "The hash function (ADR-002 DEFINIR) has not been resolved after 32 checkpoints and approximately 10.5 hours of benchmark runtime. Per §16 item 7, a DEFINIR item must be resolved in an ADR document before the feature that depends on it is implemented. Any rand() or price generator implementation submitted without a prior docs/decisions/ entry for the hash function will be blocked on this gap.",
+      "No DEFINIR items have been resolved and docs/decisions/ remains empty. Three DEFINIR items affect FASE-1 directly: ADR-002 (hash function), ADR-003 (how rounding mode enforcement is imposed at the lint/type level — DEFINIR), and ADR-007 (IMPACT_WINDOW value). Each resolved DEFINIR item removes a blocker from a work front; none have been cleared.",
+      "The encoder rejection pattern (8 consecutive task attempts, 1 approved out of 20 reviews) indicates that attempting the encoder as a large monolithic unit consistently generates new review surface area. IDEA-002 recommends the narrowest possible scope: ADR document first, then a separate encoder implementation task that cites the accepted ADR document as its specification anchor."
+    ]
+  }
+}

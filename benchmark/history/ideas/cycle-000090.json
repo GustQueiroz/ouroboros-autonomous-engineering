@@ -1,0 +1,169 @@
+{
+  "created_at": "2026-08-14T10:30:11.393211+00:00",
+  "cycle_id": "CYCLE-000090",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "Branded nominal types Money, Quantity, Price, Rate, Tick exported with validator constructors that reject non-integer and out-of-range values",
+          "Arithmetic helpers for bigint multiplication and division with explicit rounding modes (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) that emit residue",
+          "Positional RNG function rand(masterSeed, namespace, ...coordinates) -> uint64 with no mutable state",
+          "ADR written for hash function (resolving ADR-002 DEFINIR; recommended SplitMix64 over FNV-1a accumulator)",
+          "CanonicalEncoder implemented per ADR-009: UTF-8 byte-sorted keys, bigint as signed decimal ASCII, safe integer with type marker, rejection of undefined/NaN/Infinity/-0, ordered and unordered collection encoding",
+          "ADR-009 written and committed to docs/decisions/ before any StateHash computation exists",
+          "Lint passes on all core sources; no transcendental functions, no float literals, no Math.random",
+          "Unit tests covering type rejection, arithmetic edge cases, RNG determinism, and encoder round-trip for logically equal vs logically distinct states"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "large",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "ADR-003",
+          "ADR-004",
+          "ADR-009",
+          "§14.4",
+          "INV-12",
+          "INV-22",
+          "INV-23",
+          "INV-26",
+          "§15 FASE-1 aceite"
+        ],
+        "title": "Implement packages/core: nominal types, arithmetic, positional RNG, and CanonicalEncoder",
+        "why_now": "Every other FASE-1 package (world, domain, application) has packages/core as its only dependency. The package currently exports nothing. The FASE-1 acceptance criterion explicitly requires ADR-009 written and the CanonicalEncoder implemented before any state hash exists. Nothing else can be built or tested until core is populated. All FASE-1 invariants that touch arithmetic, hash, or encoding (INV-12, INV-22, INV-23, INV-26) are blocked on this."
+      },
+      {
+        "acceptance_targets": [
+          "price(assetId, tick) -> Price implemented as pure positional function using rand() from core, with two fractal noise octaves in fixed-point log-space",
+          "Two assets with distinct archetypes (e.g. ORB blue-chip, VOLT high-volatility) and their logPrice0 baseline and volBase parameters in a versioned config file",
+          "No OHLC at the base tick level; candle aggregation is a pure read projection over the tick sequence",
+          "INV-02 test: direct query at tick 1000 equals the value produced by stepping tick-by-tick from 0 to 1000",
+          "INV-03 test: two calls with different player action histories produce identical worldPrice series",
+          "ADR written for octave count, periods, and amplitudes (resolving the DEFINIR in §5.1), with a hash-compatible parameter file",
+          "All world sources pass lint; no floating-point, no transcendental functions"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-002",
+        "risk": "medium",
+        "spec_refs": [
+          "§5.1",
+          "ADR-002",
+          "ADR-003",
+          "ADR-005",
+          "ADR-007",
+          "INV-02",
+          "INV-03",
+          "§15 FASE-1 aceite"
+        ],
+        "title": "Implement packages/world: deterministic price generator with two noise layers and two assets",
+        "why_now": "packages/world is the second link in the dependency chain and is required for FASE-1 acceptance. INV-02 (direct price query equals tick-by-tick traversal) and INV-03 (player actions do not alter world price) cannot be green without it. The price generator is also the primary determinism test surface: it must produce identical output on direct access and on sequential advancement, which is the most important test in the project per the spec."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction type with per-commodity zero-sum enforcement; construction outside a Transaction is a type error",
+          "All required accounts defined (player:cash:BRL, player:spot:<ASSET>, world:counterparty_cash, world:asset_supply:<ASSET>, world:rounding_residue:<COMMODITY>, venue:fees)",
+          "Market order (buy and sell spot) execution: notional computed in bigint, fee deducted, rounding residue captured and posted to world:rounding_residue",
+          "INV-04 enforced as a runtime invariant on every Transaction commit",
+          "INV-05 and INV-06 enforced in property tests covering 1000 random order sequences",
+          "INV-07 property test: sum of all rounding residues equals exact difference between nominal and truncated totals by commodity",
+          "All domain sources pass lint; every division carries explicit rounding mode"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§6",
+          "§7",
+          "ADR-003",
+          "ADR-004",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "INV-13",
+          "§15 FASE-1 aceite"
+        ],
+        "title": "Implement packages/domain: double-entry multi-commodity ledger and spot market orders",
+        "why_now": "The ledger is the FASE-1 economic core: INV-04 (per-commodity zero-sum transactions), INV-05 (BRL sum is zero across all accounts), INV-06 (asset quantity sum is zero), and INV-07 (rounding residue fully accounts for truncation) all live here. Market order buy/sell spot with maker/taker fees and rounding-residue lancing is required by FASE-1 scope. Without domain, there is no economic state to hash, no replay to verify, and no INV-01 to test."
+      },
+      {
+        "acceptance_targets": [
+          "Canonical tick loop implements all ten steps from §7 in declared order with a test that verifies step ordering",
+          "Save envelope with specVersion, rulesetVersion, encodingVersion, masterSeed, finalTick, actions array; structural validation rejects saves where finalTick < max(action.tick) or where (tick, sequence) is not unique",
+          "SaveHash and StateHash computed via CanonicalEncoder; finalTick excluded from StateHash per ADR-009",
+          "tools/replay CLI accepts two save files and reports either 'identical' or the first tick where StateHash diverges, with the diverging values",
+          "INV-01 integration test: replay of a three-action save produces the same StateHash at every tick as the live session that created it",
+          "INV-11 test: advance from tick 0 to tick 500 in steps of 1, then 100, then direct jump; all three produce the same StateHash",
+          "INV-21 test: save with action.tick > finalTick is rejected on load"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001",
+          "IDEA-002",
+          "IDEA-003"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§7",
+          "ADR-006",
+          "ADR-009",
+          "ADR-010",
+          "INV-01",
+          "INV-11",
+          "INV-21",
+          "INV-22",
+          "§15 FASE-1 aceite"
+        ],
+        "title": "Implement packages/application tick loop, save format, and tools/replay CLI",
+        "why_now": "The canonical tick processing order (§7) must live in one place and be tested for correct ordering. The save format (ADR-006) is the unit of reproduction for every bug report and is required for INV-01, INV-21, INV-22. tools/replay is a FASE-1 acceptance target: it must compare two executions and report the first divergent tick. INV-11 (1-tick, 100-tick, and direct-jump produce identical StateHash) cannot be green without the tick loop. This is the integration layer that first combines world and domain under a typed message contract."
+      },
+      {
+        "acceptance_targets": [
+          "Electron main process owns filesystem and window lifecycle; simulation runs in a dedicated worker (simulation-worker); renderer is presentation-only",
+          "Typed IPC contracts in packages/contracts; preload exposes only an explicit allowlist of channels via contextBridge; no generic invoke(channel, args) channel",
+          "Electron security config: contextIsolation:true, nodeIntegration:false, sandbox:true in all modes including development",
+          "INV-29 automated test: reads the Electron BrowserWindow options from main source and asserts the three required flags",
+          "Minimal renderer: price chart via lightweight-charts, BRL balance display, buy and sell buttons wired to simulation worker, pause and 1x speed control",
+          "CI produces a working installer for Windows and Linux via electron-builder; installer opens the application window (even if nearly empty)",
+          "Permanent non-dismissable disclaimer in the UI per §20"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.1",
+          "§14.2",
+          "§14.6",
+          "INV-26",
+          "INV-29",
+          "§15 FASE-1 aceite"
+        ],
+        "title": "Electron scaffold: simulation worker, typed IPC, minimal UI, and CI installer build",
+        "why_now": "The spec mandates that the installer exist in FASE-1 in minimal form, explicitly because packaging problems (native module ABI, platform paths) discovered late cannot be fixed architecturally. The simulation must already run in a dedicated worker outside the renderer thread. INV-29 (contextIsolation, nodeIntegration:false, sandbox) must be green. The minimal interface (chart, balance, buy/sell, pause/1x) is a FASE-1 acceptance target. Delaying this risks discovering Electron integration problems after the domain is complete."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold is in place with workspace layout, TypeScript configuration, determinism lint rules (tested), and package boundary checker (tested). All package source files are empty stubs (export {}). No ADRs have been written. No nominal types, arithmetic, RNG, CanonicalEncoder, price generator, ledger, tick loop, save format, replay CLI, bench tool, Electron app, or installer exist.",
+      "highest_priority_gap": "packages/core has no implementation; it is the sole dependency of every other FASE-1 package and the prerequisite for ADR-009 and the CanonicalEncoder, which the spec requires to exist before any StateHash computation."
+    },
+    "warnings": []
+  }
+}
