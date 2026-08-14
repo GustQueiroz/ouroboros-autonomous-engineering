@@ -1,0 +1,141 @@
+{
+  "created_at": "2026-08-14T09:51:26.828511+00:00",
+  "cycle_id": "CYCLE-000085",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "docs/decisions/0001-canonical-encoder.md committed with no code changes in any other file",
+          "ADR defines the exact admitted type set: null, boolean, bigint, safe-integer number with a distinct type-marker prefix to prevent collision with bigint (e.g. 1n vs 1), string (UTF-8 bytes), plain object (string-keyed own enumerable data properties only), ordered array, Uint8Array",
+          "ADR explicitly forbids undefined, NaN, Infinity, -0, Symbol, class instances, functions, Proxy — occurrence is an error, not a silent normalisation",
+          "ADR specifies UTF-8 byte-order key sorting applied recursively to plain objects before encoding",
+          "ADR specifies bigint as decimal ASCII with mandatory explicit sign (+/-), no leading zeros, no exponential notation",
+          "ADR specifies how encodingVersion is prepended to the byte stream before the state payload",
+          "ADR distinguishes ordered-collection encoding (Array, Uint8Array) from sorted-key-collection encoding (plain object)"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-001",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-009",
+          "§15 FASE-1 aceite: ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir",
+          "INV-22",
+          "§9 Gate de CI item 5"
+        ],
+        "title": "Write ADR-009: CanonicalEncoder specification document only",
+        "why_now": "ADR-009 is the spec's own prerequisite gate: 'ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir.' Multiple encoder implementations have been rejected; the absence of a prior written specification that could be reviewed independently of code is the most probable structural cause. Writing ADR-009 as a pure markdown document carries zero compilation risk, can be accepted in isolation, and gives the implementer an exact algorithm reference for the next implementation attempt."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/0002-hash-function.md committed with no code changes in any other file",
+          "ADR names the chosen algorithm (recommended: SplitMix64 over an FNV-1a accumulator of the concatenated arguments) and cites its published specification",
+          "ADR specifies exact bit-width (64-bit output), all mixing constants, and shift values used verbatim",
+          "ADR specifies how masterSeed string, namespace string, and variadic coordinate number arguments are serialised and accumulated before hashing — byte layout is unambiguous",
+          "ADR specifies the return type of rand(): uint64 expressed as bigint or as a pair of 32-bit safe integers, and commits to one representation",
+          "ADR confirms the function is not the native JavaScript hash and cites why no entropy source is used"
+        ],
+        "category": "documentation",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-002",
+          "§19 Lacunas conhecidas: função de hash",
+          "§15 FASE-1: rng posicional",
+          "INV-02"
+        ],
+        "title": "Write hash function ADR (DEFINIR from ADR-002)",
+        "why_now": "ADR-002 is TRAVADO and mandates the hash function be 'especificada bit a bit em ADR, e não pode ser a função de hash nativa'. This is an explicit DEFINIR in §19. Without the written ADR, any positional RNG implementation can be rejected for lacking a specification reference. A pure documentation task with zero code risk that unblocks the RNG, which in turn unblocks the price generator and all market namespaces required for FASE-1."
+      },
+      {
+        "acceptance_targets": [
+          "packages/core/src/types.ts exports Money, Quantity, Price, Rate as branded bigint with constructors that throw on non-bigint input",
+          "packages/core/src/types.ts exports Tick as branded safe-integer number with constructor that throws on non-integer and on values outside [0, Number.MAX_SAFE_INTEGER]",
+          "Constants QUANTITY_SCALE = 100_000_000n, PRICE_SCALE = 10_000n, RATE_SCALE = 100_000_000n exported as bigint",
+          "packages/core/src/division.ts exports RoundingMode enum (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) and divBigInt(a: bigint, b: bigint, mode: RoundingMode): bigint — omitting mode argument is a TypeScript compile error",
+          "Unit tests: constructor rejects float, constructor rejects values exceeding MAX_SAFE_INTEGER for Tick, divBigInt produces exact results for each rounding mode, QUANTITY_SCALE arithmetic stays exact in bigint",
+          "No Math.random, no Date, no floating-point literals, no Math transcendentals; npm run lint exits 0"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "low",
+        "spec_refs": [
+          "ADR-003",
+          "ADR-004",
+          "§4 Modelo de domínio glossário travado",
+          "§15 FASE-1: core completo. Aritmética inteira",
+          "INV-23"
+        ],
+        "title": "Core branded arithmetic types: Money, Quantity, Price, Rate, Tick, and division helpers",
+        "why_now": "ADR-003 specifies these types precisely and completely. They are prerequisites for the ledger, price generator, positional RNG, and every downstream package. They have no dependency on the encoder or the hash function ADR and can be implemented and accepted in parallel with the documentation tasks. This is the lowest-risk code task in FASE-1 scope."
+      },
+      {
+        "acceptance_targets": [
+          "packages/core/src/rng.ts exports rand(masterSeed: string, namespace: string, ...coordinates: number[]): bigint",
+          "Function is pure: no mutable state, no closure state, identical inputs always return identical outputs",
+          "Implementation matches the hash algorithm in the hash-function ADR bit-for-bit; the ADR document number is cited in the source",
+          "Namespace isolation test: rand(s, 'market.trend', 0, 0) !== rand(s, 'market.factor', 0, 0) for a fixed seed s",
+          "Positional test: calling rand(s, ns, 9000000) directly equals the value obtained by iterating calls from 0 to 9000000 (INV-02 analog for the RNG layer)",
+          "No Math.random, no crypto, no PRNG with state; npm run lint exits 0"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "ADR-002",
+          "INV-02",
+          "INV-03",
+          "INV-12",
+          "§5.1 Construção do preço",
+          "§15 FASE-1: rng posicional"
+        ],
+        "title": "Implement positional RNG: rand(masterSeed, namespace, ...coordinates)",
+        "why_now": "INV-02 — 'consultar price(asset, t) diretamente é igual a chegar em t avançando tick por tick' — is described as the most important test in the project. It depends entirely on a stateless positional rand() function. The price generator (2 assets, 2 noise layers), the first substantive output of FASE-1, depends on rand() for every octave sample. This task should follow acceptance of IDEA-002 so the implementation has a bit-exact specification to reference."
+      },
+      {
+        "acceptance_targets": [
+          "apps/desktop/main/src/index.ts creates a BrowserWindow with contextIsolation: true, nodeIntegration: false, sandbox: true, and no webSecurity: false in any code path including development",
+          "apps/desktop/preload/src/index.ts exposes a typed empty channel allowlist via contextBridge — no generic invoke(channel, args) pattern",
+          "Window loads a static HTML page displaying the mandatory disclaimer text in Portuguese (§20)",
+          "electron-builder configuration in tools/package/ produces a .exe installer for Windows and an AppImage or .deb for Linux",
+          "CI workflow file builds both platform installers on push and uploads each as an artifact",
+          "Automated test asserts contextIsolation === true, nodeIntegration === false, sandbox === true by reading the BrowserWindow options at the call site (INV-29)"
+        ],
+        "category": "tooling",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-005",
+        "risk": "medium",
+        "spec_refs": [
+          "§14.6 Empacotamento e plataformas",
+          "§14.2 Topologia de processos",
+          "§15 FASE-1 aceite: Instalador mínimo para Windows e Linux produzido pelo CI",
+          "INV-29",
+          "§20 Aviso obrigatório no produto"
+        ],
+        "title": "Minimum Electron shell: secure BrowserWindow and CI installer for Windows and Linux",
+        "why_now": "FASE-1 acceptance requires 'Instalador mínimo para Windows e Linux produzido pelo CI, ainda que a aplicação faça pouco.' §14.6 warns explicitly that packaging problems discovered late manifest as ABI failures that cannot be fixed locally. This task is fully independent of the encoder, arithmetic types, RNG, and all domain logic. It would be the first tangible committed deliverable of the benchmark and can be assigned concurrently with documentation work."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo scaffold only. All 8 package directories export {}. All 4 desktop sub-apps export {}. All 3 tool directories export {}. docs/decisions/ contains only README.md and package.json — zero ADRs written. No production code in any file. 32 consecutive heartbeat checkpoints (approximately 10.7 hours of benchmark time) with 0 accepted tasks and 0 rejected reviews. Three DEFINIR items required before FASE-1 implementations can pass review remain unresolved: hash function (ADR-002), rounding-mode enforcement (ADR-004), and CanonicalEncoder algorithm (ADR-009).",
+      "highest_priority_gap": "Zero ADRs have been filed for any DEFINIR item. ADR-009 must be written before any encoder implementation and before any StateHash exists — this is an explicit acceptance gate in FASE-1. The CanonicalEncoder has been attempted multiple times and rejected, and the absence of a written algorithmic specification is the likely root cause. Documentation-only ADR tasks carry near-zero rejection risk and unblock all downstream implementations."
+    },
+    "warnings": [
+      "32 consecutive heartbeat checkpoints (approximately 10.7 hours) with 0 accepted tasks and 0 rejected reviews indicates a systemic stall in the autonomous loop. The ideator can only propose; diagnosing whether the failure is in task assignment, implementation compilation, or review propagation requires inspection at the orchestrator or supervisor level.",
+      "Three DEFINIR items remain unresolved with zero ADRs filed: hash function (ADR-002 prerequisite for rand()), rounding-mode enforcement mechanism (ADR-004), and CanonicalEncoder algorithm (ADR-009 prerequisite for any StateHash). Implementing any of these three without the corresponding ADR first reproduces the pre-condition failure that has blocked prior encoder attempts. IDEA-001 and IDEA-002 are ADR-only tasks with near-zero rejection risk and should be prioritised or assigned in parallel with code tasks.",
+      "IDEA-001, IDEA-002, IDEA-003, and IDEA-005 have no mutual dependencies and can be assigned concurrently. IDEA-004 depends only on IDEA-002. Assigning all five in parallel (with IDEA-004 queued behind IDEA-002) is the schedule that minimises wall-clock time to the first cluster of accepted FASE-1 deliverables."
+    ]
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "created_at": "2026-08-14T10:07:04.650239+00:00",
+  "cycle_id": "CYCLE-000087",
+  "model": "claude-sonnet-4-6",
+  "payload": {
+    "proposals": [
+      {
+        "acceptance_targets": [
+          "docs/decisions/0009-canonical-encoder.md committed with complete normative wire format: type tags, length framing, recursive UTF-8 byte-order key sorting, bigint as decimal ASCII with sign and no leading zeros, safe-integer number with distinct type marker so 1n and 1 never collide, ordered and unordered collection encoding, encodingVersion inclusion, and all rejection cases",
+          "packages/core exports canonicalEncode(state: unknown, encodingVersion: string): Uint8Array and CanonicalEncoderError",
+          "Every admitted plain object is examined via Object.getOwnPropertyNames and Object.getOwnPropertyDescriptor for ALL own string-keyed properties; any non-enumerable own property — data or accessor — causes CanonicalEncoderError without invoking the accessor",
+          "Unit test: two logically equal objects with different insertion orders encode to identical bytes",
+          "Unit test: bigint 1n and safe-integer number 1 encode to distinct bytes",
+          "Unit test: undefined, NaN, Infinity, -Infinity, -0, unsafe integers, and cycles each throw CanonicalEncoderError",
+          "Unit test: changing encodingVersion changes the encoded bytes for the same state",
+          "Captured stdout, stderr, and exit code 0 of npm run compile included in submission evidence",
+          "All existing lint, boundary, and test gates exit 0 after the change",
+          "No StateHash, SaveHash, RNG, nominal economic types, ledger, world, or Electron code introduced"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "medium",
+        "id": "IDEA-001",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-009",
+          "§15 FASE-1 acceptance: ADR-009 escrito e o encoder implementado antes de qualquer hash de estado existir",
+          "INV-22",
+          "§16 Definition of Done items 1-6",
+          "§14.4 packages/core"
+        ],
+        "title": "Write ADR-009 and implement CanonicalEncoder fresh in packages/core",
+        "why_now": "The repository has zero accepted code after 32 checkpoints. The CanonicalEncoder (ADR-009 prerequisite) is the sole blocker for all FASE-1 state-hashing work. TASK-0007 was rejected because the encoder silently admitted non-enumerable own properties instead of rejecting them. TASK-0008 was incorrectly framed as an amendment to an existing encoder, but no encoder has ever been accepted. The correct next step is a fresh, self-contained implementation that explicitly rejects non-enumerable own properties and captures compile evidence. SPEC_BLOCKERS.md contains no open blockers; any reference to BLOCKER-0001 in prior reviews was an implementation artifact and is not authoritative."
+      },
+      {
+        "acceptance_targets": [
+          "Branded bigint types Money, Quantity, Price, Rate exported from packages/core with constructors rejecting non-bigint, non-integer, and out-of-safe-bigint-range inputs",
+          "Branded number type Tick with constructor rejecting non-integer and values outside [-(2^53-1), 2^53-1]",
+          "Constants QUANTITY_SCALE=100_000_000n, PRICE_SCALE=10_000n, RATE_SCALE=100_000_000n exported as bigint literals",
+          "Division helpers requiring explicit rounding mode (TRUNCATE_TOWARD_ZERO, ROUND_HALF_UP, ROUND_HALF_EVEN) with calling without a mode being a TypeScript compile error",
+          "Property test: Tick value for ten years of game time (525_600 * 10 = 5_256_000) stays below 2^53 (INV-23)",
+          "No floating-point literals, no Math.sin/cos/exp/log/pow/sqrt, no Math.random in packages/core",
+          "All existing lint, boundary, compile, and test gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [],
+        "estimated_scope": "small",
+        "id": "IDEA-002",
+        "risk": "low",
+        "spec_refs": [
+          "§3 ADR-003",
+          "§3 ADR-004",
+          "§4 Glossário travado",
+          "§15 FASE-1: core completo. Aritmética inteira",
+          "INV-23"
+        ],
+        "title": "Implement branded numeric types in packages/core (Money, Quantity, Price, Rate, Tick)",
+        "why_now": "FASE-1 scope requires 'core completo. Aritmética inteira' and these types are prerequisites for every downstream package. ADR-003 specifies them precisely. This work is independent of the encoder and can proceed in parallel without blocking or being blocked by IDEA-001. Every attempt at ledger and world simulation will fail without nominally typed values enforced at compile time."
+      },
+      {
+        "acceptance_targets": [
+          "docs/decisions/NNNN-hash-function.md committed specifying the algorithm bit-by-bit (e.g. SplitMix64 over FNV-1a accumulator) with every arithmetic step, bit width, and mixing constant, and no dependency on the native language hash",
+          "packages/core exports rand(masterSeed: string, namespace: string, ...coordinates: number[]): bigint returning a uint64-range value as a pure function with no mutable state",
+          "Test: rand(s, ns, 9_000_000) equals the value produced by iterating coordinates 0 through 9_000_000 sequentially — same output without sequential state (INV-02 analog)",
+          "Test: different namespaces produce different values for identical remaining arguments (isolation of namespaces)",
+          "No Math.random, no Date, no crypto.randomUUID in packages/core",
+          "All existing lint, boundary, compile, and test gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002 for Tick type used as coordinate"
+        ],
+        "estimated_scope": "small",
+        "id": "IDEA-003",
+        "risk": "medium",
+        "spec_refs": [
+          "§3 ADR-002",
+          "§19 lacunas conhecidas: função de hash",
+          "§15 FASE-1: rng posicional",
+          "INV-02",
+          "INV-12"
+        ],
+        "title": "Write hash-function ADR and implement positional RNG in packages/core",
+        "why_now": "ADR-002 is TRAVADO and requires the hash function to be specified bit-by-bit in an ADR before implementation. This is an explicit DEFINIR item listed in §19 lacunas conhecidas. Without the RNG, the price generator cannot be implemented, which blocks the FASE-1 requirement of a working world with two assets. The ADR must come first so reviewers can verify correctness bit-by-bit against the spec."
+      },
+      {
+        "acceptance_targets": [
+          "Transaction type requiring at least two Entry values, each declaring commodity, account, and signed amount in the appropriate branded type",
+          "Ledger enforces per-commodity balance: sum of all Entry amounts for each commodity in a Transaction is exactly zero (INV-04)",
+          "Invariant test: running sum of all account balances for BRL is zero after any sequence of transactions (INV-05)",
+          "Invariant test: running sum for each asset commodity is zero after any sequence of transactions (INV-06)",
+          "Rounding residue goes to world:rounding_residue:<COMMODITY> accounts with ledger entries, not silently discarded (INV-07)",
+          "All mandatory account names from §6 are representable",
+          "packages/domain imports only packages/core; no import of world, application, adapters, ui, or Electron",
+          "All existing lint, boundary, compile, and test gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-002 for Money, Quantity, Price, Rate, Tick types"
+        ],
+        "estimated_scope": "medium",
+        "id": "IDEA-004",
+        "risk": "medium",
+        "spec_refs": [
+          "§6 Ledger",
+          "§15 FASE-1: Ledger multi-commodity de dupla entrada. Ordem a mercado, compra e venda spot",
+          "INV-04",
+          "INV-05",
+          "INV-06",
+          "INV-07",
+          "§14.5 domain depends only on core"
+        ],
+        "title": "Implement multi-commodity double-entry ledger in packages/domain",
+        "why_now": "FASE-1 requires market orders (buy and sell spot) backed by a ledger. The ledger enforces INV-04 through INV-07 and is the foundation of all economic correctness. It is independent of the world/price generator and can be developed once core types are available. The Definition of Done requires property tests for INV-04, INV-05, and INV-06."
+      },
+      {
+        "acceptance_targets": [
+          "A single TickProcessor function or class in packages/application implements all ten steps from §7 in declared order, readable as a list",
+          "Test that verifies processing order: a mock world and mock domain record which step was called in which order, and the test asserts the exact sequence",
+          "Market order (BUY/SELL spot) submitted in step 6 within the tick loop updates ledger entries in packages/domain using price from packages/world",
+          "No game state is computed outside the canonical order",
+          "packages/application imports packages/domain, packages/world, packages/narrative, packages/contracts; no import of adapters, ui, or Electron",
+          "All existing lint, boundary, compile, and test gates pass"
+        ],
+        "category": "feature",
+        "dependencies": [
+          "IDEA-001 for CanonicalEncoder (StateHash emitted at step 10)",
+          "IDEA-002 for Tick and Money types",
+          "IDEA-003 for world price lookup via rand",
+          "IDEA-004 for ledger"
+        ],
+        "estimated_scope": "large",
+        "id": "IDEA-005",
+        "risk": "high",
+        "spec_refs": [
+          "§7 Execução e ordem canônica do tick",
+          "§15 FASE-1: Loop de tick com a ordem canônica implementada",
+          "§14.5 application composes world and domain",
+          "INV-01",
+          "INV-11",
+          "INV-13"
+        ],
+        "title": "Implement tick-loop canonical order and market-order execution in packages/application",
+        "why_now": "FASE-1 requires 'Loop de tick com a ordem canônica implementada' and market-order buy/sell spot. The canonical tick order from §7 is TRAVADO and must be implemented in a single readable location with a test that verifies the step order. This is the integration point between core, world, and domain and the last piece needed before the CLI replay tool and FASE-1 acceptance."
+      }
+    ],
+    "repository_assessment": {
+      "current_phase": "FASE-1",
+      "current_state": "Monorepo foundation is in place (npm workspaces, tsconfig, eslint, boundary gates, test infrastructure) from the pre-benchmark scaffolding. All 8 packages and 4 desktop sub-apps exist but every src/index.ts is an empty stub. No ADRs have been committed. No substantive implementation code has been accepted in 32 checkpoints (all show NO_ACCEPTED_CHANGES, internal_commit_count=0). Six consecutive tasks (TASK-0003 through TASK-0008) targeted the CanonicalEncoder; all were rejected — first for a non-enumerable property defect, then for incorrect task framing as an amendment to non-existent code.",
+      "highest_priority_gap": "The canonical encoder (ADR-009) has never been successfully implemented and accepted. It is the mandatory prerequisite for all FASE-1 state hashing. The last review (TASK-0008-review-02) cited BLOCKER-0001 as blocking, but SPEC_BLOCKERS.md contains no registered blockers; that reference was an uncommitted implementation artifact. The correct next step is a fresh CanonicalEncoder implementation — not an amendment — that explicitly rejects non-enumerable own properties and captures compile evidence."
+    },
+    "warnings": [
+      "TASK-0008-review-02 cited BLOCKER-0001 as OPEN in SPEC_BLOCKERS.md, but the committed SPEC_BLOCKERS.md contains zero entries. This discrepancy arose because an implementation agent wrote a blocker entry that was never committed to the repository. Any task definition that references BLOCKER-0001 or treats the encoder work as blocked will mislead the implementer. The Planner must frame the next task as a fresh CanonicalEncoder implementation and must not reference or await BLOCKER-0001.",
+      "TASK-0008 was framed as an amendment ('Close CanonicalEncoder non-enumerable-property defect') implying a previously accepted encoder. No encoder has been accepted. The amendment framing caused the reviewer to treat a complete fresh encoder as out-of-scope scope creep. The task must be reframed as a first implementation to avoid the same rejection."
+    ]
+  }
+}
