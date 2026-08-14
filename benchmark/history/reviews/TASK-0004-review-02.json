@@ -1,0 +1,122 @@
+{
+  "created_at": "2026-08-14T03:06:52.840889+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 exists under docs/decisions and specifies enough byte-level detail, including type tags and framing, for an independent implementation to reproduce identical bytes.",
+        "evidence": "docs/decisions/0009-canonical-encoder.md defines the CE1 envelope, unsigned LEB128 framing, tags 0x00–0x09, primitive bodies, UTF-8 rules, object ordering, and collection encodings.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The implementation contains no encoding decision absent from ADR-009; ADR-009 is committed in the same change before or with code depending on it.",
+        "evidence": "ADR-009 §9 says user-controllable code must not run and claims only built-in Array/Set iterators are used, but the implementation performs `for (const item of asObject)` on Set instances and `array[index]` on arrays. Those operations can invoke overridden iterators, Proxy traps, or array accessors; their handling and resulting arbitrary exceptions are not defined by the ADR.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Logically equal supported objects encode to byte-identical output regardless of property insertion order.",
+        "evidence": "Object entries are sorted by encoded key bytes; permutation tests cover ordinary and numeric-looking keys.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Object keys are ordered by their UTF-8 byte sequences using a locale-independent comparison; tests include keys for which locale or UTF-16 ordering would give a different result.",
+        "evidence": "compareUnsignedBytes compares Uint8Array elements, and tests cover U+FF00 versus U+1F600 plus `b` versus `ä`.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Safe integers use a type marker distinct from bigint; non-integer numbers and integers outside Number safe-integer bounds are rejected deterministically.",
+        "evidence": "Tags 0x03 and 0x04 are distinct and ordinary invalid numbers receive dedicated errors, but classification reads mutable global methods such as Number.isNaN and Number.isInteger. Replacing those methods can change behavior for identical arguments, contrary to the mutable-global-state prohibition.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Bigints use the ADR-defined signed decimal ASCII representation with an explicit sign and cannot collide with safe-integer encodings.",
+        "evidence": "encodeBigIntBody emits `+` or `-` followed by base-10 magnitude, with tag 0x04 distinct from safe integer tag 0x03; exact-byte and collision tests cover signed and boundary values.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "undefined, NaN, positive and negative Infinity, and negative zero each produce an explicit deterministic error and are never normalized.",
+        "evidence": "Ordinary direct values receive explicit codes, but admitted container traversal can execute user code and surface arbitrary native/user exceptions before canonical rejection; array accessors and Proxy traps are not converted into CanonicalEncoderError.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Ordered collections preserve element order; every supported unordered collection is canonicalized using the exact sorting rule recorded in ADR-009.",
+        "evidence": "Arrays are emitted in index order and Set element encodings are sorted lexicographically by unsigned bytes; order-sensitivity and insertion-order-independence tests pass for ordinary collections.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Changing encodingVersion changes the canonical byte sequence for the same supported value.",
+        "evidence": "The UTF-8 version is length-framed immediately after magic, and the ce1/ce2 test asserts differing bytes.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The encoder does not read time, randomness, locale, environment, filesystem, network, or mutable global state.",
+        "evidence": "The implementation reads mutable globals and prototype properties at call time, including Number.isNaN, Number.isInteger, Object.getPrototypeOf, Object.getOwnPropertyDescriptor, Reflect.ownKeys, Object.prototype, Set, and Uint8Array. Monkeypatching these can alter results or errors for identical inputs.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "No StateHash API or finalTick-specific behavior is introduced by this change.",
+        "evidence": "Changed implementation and exports contain only canonical encoding APIs and metadata; no StateHash or finalTick logic appears.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository lint, strict typecheck, dependency-boundary checks, and all pre-existing tests pass.",
+        "evidence": "Automated validation reports lint and 104/104 tests passing; npm test runs pretest compile, which executes strict `tsc -b`. The implementer separately reports `npm run boundary` passing with 15 workspaces validated, and boundary tests are included in the automated suite.",
+        "status": "PASS"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "canonical-encoder.ts uses `instanceof`, Array.isArray, Object.getPrototypeOf, Reflect.ownKeys, Object.getOwnPropertyDescriptor, array indexed reads, and `for...of` Set traversal. Proxies can trap getPrototypeOf, ownKeys, and getOwnPropertyDescriptor; arrays can have indexed accessors; Set instances/subclasses can override Symbol.iterator. The sole Proxy regression test checks only a `get` trap on an ordinary object and therefore does not cover these paths. This contradicts ADR-009 §9 and can expose arbitrary exceptions or side effects instead of deterministic CanonicalEncoderError behavior.",
+        "id": "REVIEW-001",
+        "required_change": "Define an implementable admitted-container model in ADR-009 and make traversal conform to it. Either reject proxies/subclasses/accessor-bearing arrays deterministically without invoking their code, or use captured trusted intrinsics and descriptor-based traversal so admitted values cannot execute user code. Add tests for ownKeys/getOwnPropertyDescriptor/getPrototypeOf Proxy traps, array index accessors/proxies, overridden Set iterators, Set subclasses, and revoked proxies, asserting both zero unintended calls and deterministic dedicated errors.",
+        "severity": "BLOCKER",
+        "title": "Admitted container inspection executes user-controlled code"
+      },
+      {
+        "evidence": "The encoder resolves mutable built-ins during every call, including Number.isNaN, Number.isInteger, Number.MAX_SAFE_INTEGER/MIN_SAFE_INTEGER at module initialization, Object.getPrototypeOf, Object.getOwnPropertyDescriptor, Object.prototype, Reflect.ownKeys, Set, and Uint8Array. ADR-009 §9 and the acceptance criteria require output to avoid mutable global state, but callers can replace several of these functions or constructors after import and change output or failure behavior.",
+        "id": "REVIEW-002",
+        "required_change": "Capture all required trusted intrinsics and immutable reference values in module-private bindings before callers can mutate them, and invoke intrinsic operations in a receiver-safe way. Add regression tests that monkeypatch relevant global methods/constructors/prototype methods after module import and prove identical bytes and canonical errors remain unchanged.",
+        "severity": "MAJOR",
+        "title": "Encoder behavior depends on mutable global built-ins"
+      }
+    ],
+    "invariants_checked": [
+      "INV-22 canonical bytes for ordinary logically equal objects",
+      "Distinct Number safe-integer and bigint encodings",
+      "UTF-8 unsigned-byte object-key ordering",
+      "Ordered-array and unordered-Set semantics",
+      "encodingVersion participation",
+      "No StateHash or finalTick behavior",
+      "Pure-package dependency boundaries",
+      "Explicit prohibited-number handling",
+      "Cycle detection for ordinary containers",
+      "Public tag and magic metadata cannot mutate encoder scalars"
+    ],
+    "risks": [
+      "Arbitrary user code can run during encoding and introduce time, randomness, mutation, or side effects.",
+      "User-thrown or native Proxy errors can escape instead of the ADR-defined CanonicalEncoderError codes.",
+      "Monkeypatching built-ins can change canonical bytes or rejection behavior for identical input and encodingVersion.",
+      "Set failure diagnostic paths remain insertion-index based, so equal unordered invalid collections may report different paths; ADR should clarify whether diagnostic determinism includes unordered insertion permutations."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The byte grammar and ordinary-value coverage are strong, but the encoder violates its own ADR and task purity requirements by invoking or reading mutable user-controlled behavior for admitted containers. Proxy traps, overridden Set iteration, array property accessors, and mutable built-in methods can affect output or throw non-canonical errors.",
+    "task_id": "TASK-0004",
+    "validation_assessment": {
+      "missing": [
+        "Adversarial tests for Proxy ownKeys, getOwnPropertyDescriptor, and getPrototypeOf traps",
+        "Tests for array indexed accessors and proxied arrays",
+        "Tests for overridden Set iteration and Set subclasses",
+        "Tests proving mutation of built-in globals cannot affect encoding",
+        "Deterministic handling test for revoked proxies"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 2,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0004"
+}

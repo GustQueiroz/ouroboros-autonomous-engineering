@@ -1,0 +1,63 @@
+{
+  "attempt": 2,
+  "created_at": "2026-08-14T03:05:33.849199+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "changed_files": [
+      "docs/decisions/0009-canonical-encoder.md",
+      "packages/core/src/canonical-encoder.ts",
+      "packages/core/src/index.ts",
+      "tests/canonical/encoder.test.mjs"
+    ],
+    "findings": [
+      {
+        "finding_id": "REVIEW-001",
+        "resolution": "canonical-encoder.ts now uses module-private primitive constants (MAGIC_BYTE_0/1/2, TAG_NULL..TAG_SET) that are numbers and cannot be mutated. The public CANONICAL_TAG is Object.freeze'd, and the mutable Uint8Array magic export was replaced with canonicalFormatMagic(), which returns a fresh Uint8Array. ADR-009 §9 formalises the ban on behavior-defining scalars being reachable through exports. Three new tests exercise the invariant: mutating the returned magic array, writing a frozen tag property, and defineProperty on the frozen tag.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-002",
+        "resolution": "ADR-009 §4 now specifies the plain-object property model at byte-level precision: Reflect.ownKeys enumeration, E_NON_STRING_KEY for symbol keys, E_NON_ENUMERABLE_KEY (new) for non-enumerable own keys, E_ACCESSOR_PROPERTY (new) for any descriptor with get/set, and value reads exclusively from descriptor.value. The implementation matches; getters/setters are never invoked. Five new regression tests: enumerable getter, setter-only, throwing getter, non-enumerable data property, and Proxy-target parity — with call counters asserting zero getter/trap invocations.",
+        "status": "RESOLVED"
+      },
+      {
+        "finding_id": "REVIEW-003",
+        "resolution": "Ran `npm run boundary` on the corrected candidate and captured PASS output (`dependency-boundary: OK. 15 workspace packages validated against §14.5.`) alongside compile, lint, and the full 104-test suite.",
+        "status": "RESOLVED"
+      }
+    ],
+    "notes_for_reviewer": [
+      "package.json and packages/core/src/index.ts were already staged/modified before the rework; the corrections only extended them (index.ts exports canonicalFormatMagic in place of CANONICAL_FORMAT_MAGIC; no changes to package.json in this iteration).",
+      "CANONICAL_FORMAT_MAGIC (the previously exported Uint8Array) was intentionally replaced by canonicalFormatMagic() — a function that returns a fresh Uint8Array on every call — because typed-array indexed writes cannot be reliably prevented by Object.freeze. The mutation-regression test verifies that writing into the returned buffer does not affect subsequent canonical output.",
+      "Set diagnostic paths still incorporate insertion index (`$#set[N]`). The review flagged this only as a risk, not as a required change, so it was left as-is; a future ADR clarification would be needed before altering it."
+    ],
+    "remaining_issues": [],
+    "review_iteration": 1,
+    "status": "COMPLETED",
+    "summary": "Rewrote canonical-encoder.ts so the byte output is driven exclusively by module-private primitive scalar constants (MAGIC_BYTE_0..2 and TAG_* numbers). The exported CANONICAL_TAG is now Object.freeze'd, and the mutable Uint8Array export CANONICAL_FORMAT_MAGIC was replaced with a canonicalFormatMagic() function that returns a fresh copy each call so a caller cannot influence the encoder by mutating any exported value. ADR-009 now defines the plain-object property model precisely: own keys are read via Reflect.ownKeys, symbol keys → E_NON_STRING_KEY, non-enumerable own keys → E_NON_ENUMERABLE_KEY (new code), accessor properties → E_ACCESSOR_PROPERTY (new code, getter/setter never invoked), and data property values are taken from descriptor.value so no user code — including Proxy [[Get]] traps — runs during object encoding. ADR-009 §9 was also expanded to formally forbid the encoder from reading behavior-defining scalars via exported references and to forbid running user code during encoding. Added regression tests: mutation of canonicalFormatMagic() output, frozen CANONICAL_TAG rejects writes, getter/setter/getter-throws/non-enumerable rejection with call-count assertions proving getters/setters are not invoked, Object.freeze-transparent encoding, and Proxy-target parity. Verified compile, lint, boundary, and full test suite (104/104) — including the previously missing `npm run boundary` gate.",
+    "task_id": "TASK-0004",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json completed with no diagnostics"
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 . reported zero warnings across the repo"
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "dependency-boundary: OK. 15 workspace packages validated against §14.5"
+      },
+      {
+        "command": "npm test",
+        "result": "PASS",
+        "summary": "node --test across tests/{config,lint,boundary,canonical} — 104 pass, 0 fail, 0 skipped, including all new mutation/accessor/non-enumerable/Proxy regression tests"
+      }
+    ]
+  },
+  "task_id": "TASK-0004"
+}

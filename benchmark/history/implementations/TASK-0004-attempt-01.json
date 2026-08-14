@@ -1,0 +1,120 @@
+{
+  "attempt": 1,
+  "created_at": "2026-08-14T02:57:34.860025+00:00",
+  "implementer_model": "claude-opus-4-7",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 exists under docs/decisions with byte-level detail sufficient for byte-identical reimplementation",
+        "evidence": "docs/decisions/0009-canonical-encoder.md defines envelope, varint (LEB128), tag table 0x00-0x09, per-tag bodies (safe-int/bigint/string/bytes/array/object/set), UTF-8 key ordering rule, admitted/prohibited value set, cycle handling, error codes, determinism/purity constraints",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Implementation contains no encoding decision absent from ADR-009; ADR committed with code",
+        "evidence": "packages/core/src/canonical-encoder.ts mirrors ADR sections 1-9; ADR and implementation created in the same change under branch candidate/cycle-000043",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Logically equal supported objects encode to byte-identical output regardless of property insertion order",
+        "evidence": "tests/canonical/encoder.test.mjs: 'permutation: {a,b,c} equals {c,b,a} in bytes' and 'numeric-looking keys' cases pass; encoder sorts entries by UTF-8 bytes",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Object keys ordered by UTF-8 bytes with locale-independent comparison; UTF-16/locale-differing tests present",
+        "evidence": "'UTF-8 byte order beats UTF-16 code unit order' asserts U+FF00 precedes U+1F600 despite JS < ordering them oppositely; 'ä vs b' asserts b precedes ä in bytes despite locale-typical ä<b",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Safe integers use type tag distinct from bigint; non-integer numbers and unsafe integers rejected deterministically",
+        "evidence": "Tag 0x03 vs 0x04; rejection tests E_NON_INTEGER for 1.5, E_UNSAFE_INTEGER for MAX_SAFE_INTEGER+1 and MIN_SAFE_INTEGER-1 all pass",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Bigints use signed decimal ASCII with explicit sign and cannot collide with safe-integer encodings",
+        "evidence": "encodeBigIntBody prepends '+' or '-'; golden vectors 0n->2b30, 1n->2b31, -1n->2d31; 'safe int and bigint of value 1 have distinct byte sequences' passes",
+        "status": "PASS"
+      },
+      {
+        "criterion": "undefined, NaN, +/-Infinity, and -0 each produce explicit deterministic errors and are never normalized",
+        "evidence": "E_UNDEFINED (top, in array, in object, in set), E_NAN, E_INFINITY (both signs), E_NEGATIVE_ZERO tests all pass with distinct codes",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Ordered collections preserve element order; unordered collections canonicalized per ADR sort rule",
+        "evidence": "'ordered arrays: element order affects bytes' and 'unordered sets: insertion order does not affect bytes' both pass; Set elements sorted by UTF-8 lexicographic byte comparison of pre-encoded items",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Changing encodingVersion changes the canonical byte sequence for the same value",
+        "evidence": "'envelope: version-string participates in the bytes' test compares encode(null, 'ce1') != encode(null, 'ce2')",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Encoder reads no time/randomness/locale/environment/filesystem/network/mutable global state",
+        "evidence": "Source uses only Number/Object.is/Number.isInteger/Reflect.ownKeys/Uint8Array/Set with a local frame per call; explicit UTF-8 encoder replaces TextEncoder; pure lint rules pass",
+        "status": "PASS"
+      },
+      {
+        "criterion": "No StateHash API or finalTick-specific behavior introduced",
+        "evidence": "ADR §10 explicitly excludes them; no StateHash symbol exists; grep for finalTick and StateHash inside the new files returns nothing beyond ADR non-goal notes",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository lint, strict typecheck, dependency-boundary, and pre-existing tests pass",
+        "evidence": "npm run compile (tsc -b, no errors), npm run lint (eslint --max-warnings=0 clean), npm run boundary (15 workspace packages OK), npm run test (92 passed / 0 failed)",
+        "status": "PASS"
+      }
+    ],
+    "adrs_created_or_updated": [
+      "docs/decisions/0009-canonical-encoder.md"
+    ],
+    "changed_files": [
+      "docs/decisions/0009-canonical-encoder.md",
+      "packages/core/src/canonical-encoder.ts",
+      "packages/core/src/index.ts",
+      "package.json",
+      "tests/canonical/encoder.test.mjs"
+    ],
+    "discovered_out_of_scope_issues": [
+      "packages/core/package.json main/types still point to src/index.ts (source .ts) rather than the compiled dist entrypoint; not required by this task but downstream Node consumers would need the runtime path. Left unchanged to avoid touching workspace resolution beyond scope."
+    ],
+    "invariants_affected": [
+      "INV-13",
+      "INV-22"
+    ],
+    "known_issues": [],
+    "notes_for_reviewer": [
+      "Encoder uses an explicit hand-rolled UTF-8 encoder rather than the runtime TextEncoder so it is portable across V8 configurations and avoids adding @types/node or the DOM lib to the pure core tsconfig.",
+      "Cycle detection uses a per-encode Set that is add-before/delete-after; sibling occurrences of the same reference are admitted (test 'sibling occurrences of the same reference are not treated as cyclic').",
+      "Tests import the compiled dist from packages/core/dist/index.js and rely on Node's CJS-from-ESM named-export interop; a pretest npm script now runs compile before tests so a clean checkout can npm test without a separate compile step. CI already runs compile before test, so the pretest is a no-op there.",
+      "encodingVersion is a caller-provided string; the ADR treats it as opaque and does not prescribe a bump policy — that continues to belong in the Definition of Done and future ADRs when the format evolves.",
+      "ADR §10 (Non-goals) documents that StateHash and finalTick exclusion belong outside this ADR, matching INV-22's requirement that finalTick be excluded 'outside this encoder'."
+    ],
+    "status": "COMPLETED",
+    "summary": "Wrote ADR-009 with a byte-level canonical encoding grammar (envelope magic \"CE1\", LEB128 length framing, ten type tags, UTF-8 key ordering, safe-integer vs bigint distinction, explicit-sign bigint decimal, rejection rules, cycle handling, encodingVersion participation). Implemented CanonicalEncoder in packages/core with an explicit UTF-8 encoder (no TextEncoder dependency), a growing byte buffer, deterministic CanonicalEncoderError with typed codes, and a stateless top-level canonicalEncode(value, {encodingVersion}). Exported the encoder, error class, tag table, magic bytes, and value/option types from packages/core/src/index.ts. Added a 50-case test suite covering envelope, tag table, golden vectors for every admitted primitive and container, permutation-invariance, UTF-8 vs UTF-16/locale key ordering, integer/bigint collision-freeness, ordered-vs-unordered semantics, encodingVersion sensitivity, and rejection of every prohibited value plus cyclic containers. Wired the suite into npm test and added a pretest hook that compiles before running tests so the compiled entrypoint is always fresh.",
+    "task_id": "TASK-0004",
+    "validation": [
+      {
+        "command": "npm run compile",
+        "result": "PASS",
+        "summary": "tsc -b tsconfig.json completes with no diagnostics"
+      },
+      {
+        "command": "npm run lint",
+        "result": "PASS",
+        "summary": "eslint --max-warnings=0 reports zero warnings and zero errors across the repository"
+      },
+      {
+        "command": "npm run boundary",
+        "result": "PASS",
+        "summary": "15 workspace packages validated against §14.5 with no direct or transitive violations"
+      },
+      {
+        "command": "npm run test",
+        "result": "PASS",
+        "summary": "node --test across config, lint, boundary, and canonical suites: 92 pass, 0 fail, 0 skip"
+      }
+    ]
+  },
+  "task_id": "TASK-0004"
+}

@@ -1,0 +1,125 @@
+{
+  "created_at": "2026-08-14T02:59:15.948434+00:00",
+  "decision": "REQUEST_CHANGES",
+  "payload": {
+    "acceptance_criteria": [
+      {
+        "criterion": "ADR-009 exists under docs/decisions and specifies enough byte-level detail, including type tags and framing, for an independent implementation to reproduce identical bytes.",
+        "evidence": "docs/decisions/0009-canonical-encoder.md defines framing, tags, UTF-8, varints, and containers, but admits plain objects without specifying whether accessor properties are admitted or rejected. The implementation invokes getters through record[entry.keyString], an observable encoding decision not described by ADR-009.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "The implementation contains no encoding decision absent from ADR-009; ADR-009 is committed in the same change before or with code depending on it.",
+        "evidence": "ADR and code are included together, but canonical-encoder.ts chooses to enumerate non-enumerable own properties via Reflect.ownKeys and invoke accessor getters via ordinary property access without ADR rules governing property descriptors or getter behavior.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "Logically equal supported objects encode to byte-identical output regardless of property insertion order.",
+        "evidence": "Object entries are sorted with compareUnsignedBytes over encoded UTF-8 keys; permutation tests cover ordinary and numeric-looking keys.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Object keys are ordered by their UTF-8 byte sequences using a locale-independent comparison; tests include keys for which locale or UTF-16 ordering would give a different result.",
+        "evidence": "compareUnsignedBytes performs unsigned byte lexicographic comparison. Tests cover U+FF00 versus U+1F600 and \"b\" versus \"ä\".",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Safe integers use a type marker distinct from bigint; non-integer numbers and integers outside Number safe-integer bounds are rejected deterministically.",
+        "evidence": "SafeInteger is tag 0x03 and BigInt is 0x04. Dedicated checks and tests cover fractional and both unsafe boundaries.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Bigints use the ADR-defined signed decimal ASCII representation with an explicit sign and cannot collide with safe-integer encodings.",
+        "evidence": "encodeBigIntBody emits '+' or '-' followed by decimal magnitude; golden and collision tests cover zero, signs, and boundary values.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "undefined, NaN, positive and negative Infinity, and negative zero each produce an explicit deterministic error and are never normalized.",
+        "evidence": "Dedicated CanonicalEncoderError codes and rejection tests exist for every listed value, including undefined in top-level and admitted container positions.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Ordered collections preserve element order; every supported unordered collection is canonicalized using the exact sorting rule recorded in ADR-009.",
+        "evidence": "Arrays encode in index order; Set elements are independently encoded then sorted lexicographically by unsigned bytes. Tests demonstrate ordered and unordered behavior.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Changing encodingVersion changes the canonical byte sequence for the same supported value.",
+        "evidence": "The version UTF-8 frame is part of the envelope, and the ce1/ce2 test verifies different output.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "The encoder does not read time, randomness, locale, environment, filesystem, network, or mutable global state.",
+        "evidence": "canonicalEncode reads exported CANONICAL_FORMAT_MAGIC and CANONICAL_TAG values. Both are mutable at runtime: Readonly<Uint8Array> and `as const` provide only TypeScript compile-time restrictions. A JavaScript consumer can mutate CANONICAL_FORMAT_MAGIC[0] or CANONICAL_TAG.Null and thereby change subsequent output for identical arguments.",
+        "status": "FAIL"
+      },
+      {
+        "criterion": "No StateHash API or finalTick-specific behavior is introduced by this change.",
+        "evidence": "The changed implementation and public entry point introduce only canonical encoding APIs; ADR §10 leaves StateHash and finalTick filtering outside this encoder.",
+        "status": "PASS"
+      },
+      {
+        "criterion": "Repository lint, strict typecheck, dependency-boundary checks, and all pre-existing tests pass.",
+        "evidence": "Automated output proves lint and npm test passed; npm test's pretest proves compilation ran. No dependency-boundary command appears in the automated validation output, despite being a required gate. The Implementer report alone is insufficient verification.",
+        "status": "FAIL"
+      }
+    ],
+    "decision": "REQUEST_CHANGES",
+    "findings": [
+      {
+        "evidence": "canonicalEncode writes CANONICAL_FORMAT_MAGIC and encodeValue reads CANONICAL_TAG on every call. Both objects are publicly exported and remain mutable at runtime, so external mutation changes canonical bytes for the same value and encodingVersion, violating the purity and determinism acceptance criterion and INV-22.",
+        "id": "REVIEW-001",
+        "required_change": "Ensure encoding uses private immutable scalar values that cannot be modified through exported references. Public metadata may be exposed only in a form whose mutation cannot affect encoder behavior. Add regression tests that attempt mutation through every exported runtime metadata object and verify canonical output remains unchanged.",
+        "severity": "BLOCKER",
+        "title": "Public mutable constants control canonical bytes"
+      },
+      {
+        "evidence": "ADR-009 admits plain objects without defining property-descriptor rules. The implementation uses Reflect.ownKeys and then record[entry.keyString], which invokes getters. A getter can read time/randomness/global state, mutate the object, throw a non-CanonicalEncoderError, or return different values between identical calls. Non-enumerable property inclusion is likewise an unstated semantic choice.",
+        "id": "REVIEW-002",
+        "required_change": "Define ordinary-object property and descriptor semantics in ADR-009 at byte-level precision, and implement them without invoking accessors. Deterministically reject accessor properties with a dedicated documented error, or otherwise constrain the admitted representation in an enforceable deterministic manner. Add tests for getters, setters, non-enumerable properties, and getter-thrown errors.",
+        "severity": "MAJOR",
+        "title": "Plain-object accessor behavior is unspecified and nondeterministic"
+      },
+      {
+        "evidence": "Automated validation ran dependency installation, diff check, lint, and test only. It did not run `npm run boundary`; the task explicitly requires dependency-boundary validation.",
+        "id": "REVIEW-003",
+        "required_change": "Run and provide successful output for the repository dependency-boundary gate on the corrected candidate, along with lint, strict compilation/typecheck, and the full test suite.",
+        "severity": "MAJOR",
+        "title": "Required boundary validation lacks automated evidence"
+      }
+    ],
+    "invariants_checked": [
+      "INV-22 equal logical states require equal canonical bytes",
+      "Pure-package nondeterminism restrictions",
+      "Existing workspace and dependency-boundary architecture",
+      "Safe-integer and bigint encoding separation",
+      "UTF-8 object-key ordering",
+      "Ordered array and unordered Set semantics",
+      "StateHash/finalTick scope separation",
+      "Cycle rejection and shared-reference handling",
+      "Version participation in canonical bytes"
+    ],
+    "risks": [
+      "Canonical hashes can change at runtime after mutation of exported constants.",
+      "Getter-backed properties can inject nondeterminism, side effects, arbitrary exceptions, or state mutation into encoding.",
+      "Set rejection diagnostics incorporate insertion indices, so equivalent unordered Sets can report different paths; ADR should clarify whether diagnostic paths must be canonical for unordered collections."
+    ],
+    "scope_assessment": {
+      "unrelated_changes": [],
+      "within_scope": true
+    },
+    "summary": "The byte grammar and main canonicalization behavior are substantially implemented, but the encoder reads publicly mutable exported constants, so identical inputs can produce different bytes after caller mutation. Object accessor semantics are also unspecified and permit nondeterministic execution. Required dependency-boundary validation is not present in the automated evidence.",
+    "task_id": "TASK-0004",
+    "validation_assessment": {
+      "missing": [
+        "Automated `npm run boundary` result",
+        "Regression test proving exported metadata mutation cannot affect output",
+        "Accessor and property-descriptor determinism tests"
+      ],
+      "sufficient": false
+    }
+  },
+  "review_iteration": 1,
+  "supervisor_model": "gpt-5.6-sol",
+  "task_id": "TASK-0004"
+}
